@@ -1,0 +1,104 @@
+# Algotrading Agent Configuration
+
+# Global settings
+app:
+  name: "Algotrading Agent"
+  version: "1.0.0"
+  log_level: "INFO"
+  data_dir: "/app/data"
+  
+# News Scraper Configuration
+news_scraper:
+  update_interval: 300  # 5 minutes
+  sources:
+    - name: "Reuters Business"
+      type: "rss"
+      url: "https://feeds.reuters.com/reuters/businessNews"
+    - name: "Yahoo Finance"
+      type: "rss" 
+      url: "https://feeds.finance.yahoo.com/rss/2.0/headline"
+    - name: "MarketWatch"
+      type: "rss"
+      url: "http://feeds.marketwatch.com/marketwatch/marketpulse/"
+
+# News Filter Configuration  
+news_filter:
+  min_score: 0.3
+  recency_weight: 0.5
+  keywords:
+    - pattern: "earnings|revenue|profit"
+      weight: 1.5
+    - pattern: "merger|acquisition|buyout"
+      weight: 2.0
+    - pattern: "fda|approval"
+      weight: 1.8
+    - pattern: "partnership|deal"
+      weight: 1.2
+  blacklist:
+    - "celebrity"
+    - "sports"
+    - "entertainment"
+  source_weights:
+    "Reuters Business": 0.9
+    "Yahoo Finance": 0.7
+    "MarketWatch": 0.8
+
+# News Analysis Brain Configuration
+news_analysis_brain:
+  sentiment_threshold: 0.1
+  entity_patterns:
+    companies:
+      - "Apple Inc"
+      - "Microsoft Corp"
+      - "Tesla Inc"
+    sectors:
+      - "technology"
+      - "healthcare" 
+      - "finance"
+  impact_keywords:
+    "breakthrough": 0.3
+    "record": 0.25
+    "massive": 0.2
+    "significant": 0.15
+
+# Decision Engine Configuration
+decision_engine:
+  min_confidence: 0.6
+  max_position_size: 1000
+  sentiment_weight: 0.4
+  impact_weight: 0.3
+  recency_weight: 0.3
+  default_stop_loss_pct: 0.05    # 5% stop loss
+  default_take_profit_pct: 0.10  # 10% take profit
+
+# Risk Manager Configuration
+risk_manager:
+  max_portfolio_value: 100000     # $100k virtual money
+  max_position_pct: 0.05          # 5% per position
+  max_daily_loss_pct: 0.02        # 2% daily loss limit
+  max_sector_exposure_pct: 0.20   # 20% per sector
+  correlation_threshold: 0.7
+  blacklisted_symbols:
+    - "PENN"  # Example blacklisted symbol
+
+# Statistical Advisor Configuration
+statistical_advisor:
+  min_trades_for_analysis: 10
+  lookback_days: 30
+  confidence_threshold: 0.6
+
+# Alpaca API Configuration
+alpaca:
+  paper_trading: true
+  base_url: "https://paper-api.alpaca.markets"
+  data_url: "https://data.alpaca.markets"
+  # API keys should be set via environment variables:
+  # ALPACA_API_KEY and ALPACA_SECRET_KEY
+  
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "/app/logs/algotrading.log"
+  max_size: "10MB"
+  backup_count: 5
