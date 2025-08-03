@@ -14,6 +14,8 @@ services:
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
       - ALPACA_PAPER_TRADING=true
+      - ALPACA_API_KEY=${ALPACA_API_KEY}
+      - ALPACA_SECRET_KEY=${ALPACA_SECRET_KEY}
     
     # Volumes for data persistence
     volumes:

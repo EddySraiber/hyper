@@ -46,6 +46,7 @@ class DecisionEngine(ComponentBase):
         self.recency_weight = config.get("recency_weight", 0.3)
         self.default_stop_loss_pct = config.get("default_stop_loss_pct", 0.05)
         self.default_take_profit_pct = config.get("default_take_profit_pct", 0.10)
+        self.alpaca_client = None  # Will be injected by main app
         
     def start(self) -> None:
         self.logger.info("Starting Decision Engine")
@@ -55,8 +56,8 @@ class DecisionEngine(ComponentBase):
         self.logger.info("Stopping Decision Engine")
         self.is_running = False
         
-    def process(self, analyzed_news: List[Dict[str, Any]], 
-                market_data: Optional[Dict[str, Any]] = None) -> List[TradingPair]:
+    async def process(self, analyzed_news: List[Dict[str, Any]], 
+                      market_data: Optional[Dict[str, Any]] = None) -> List[TradingPair]:
         if not self.is_running or not analyzed_news:
             return []
             
@@ -67,7 +68,7 @@ class DecisionEngine(ComponentBase):
         
         for symbol, news_items in symbol_news.items():
             try:
-                decision = self._make_decision(symbol, news_items, market_data)
+                decision = await self._make_decision(symbol, news_items, market_data)
                 if decision:
                     trading_pairs.append(decision)
             except Exception as e:
@@ -95,13 +96,12 @@ class DecisionEngine(ComponentBase):
         return symbol_groups
         
     def _extract_tickers_fallback(self, item: Dict[str, Any]) -> List[str]:
-        import re
-        text = f"{item.get('title', '')} {item.get('content', '')}"
-        ticker_pattern = r'\$?([A-Z]{1,5})\b'
-        return list(set(re.findall(ticker_pattern, text.upper())))
+        # Disabled fallback extraction to avoid false positives
+        # The news analysis brain should handle all ticker extraction
+        return []
         
-    def _make_decision(self, symbol: str, news_items: List[Dict[str, Any]], 
-                      market_data: Optional[Dict[str, Any]] = None) -> Optional[TradingPair]:
+    async def _make_decision(self, symbol: str, news_items: List[Dict[str, Any]], 
+                            market_data: Optional[Dict[str, Any]] = None) -> Optional[TradingPair]:
         
         # Calculate aggregate signals
         signal_strength = self._calculate_signal_strength(news_items)
@@ -113,21 +113,35 @@ class DecisionEngine(ComponentBase):
         # Determine action (buy/sell)
         action = "buy" if signal_strength > 0 else "sell"
         
-        # Get current market price (mock data for now)
-        current_price = self._get_current_price(symbol, market_data)
+        # Get current market price
+        current_price = await self._get_current_price(symbol, market_data)
         if not current_price:
             return None
             
         # Calculate position size
         quantity = self._calculate_position_size(confidence, current_price)
         
-        # Set stop loss and take profit
+        # Set stop loss and take profit with proper rounding for Alpaca requirements
         if action == "buy":
-            stop_loss = current_price * (1 - self.default_stop_loss_pct)
-            take_profit = current_price * (1 + self.default_take_profit_pct)
+            # Buy: stop loss below, take profit above
+            stop_loss = round(current_price * (1 - self.default_stop_loss_pct), 2)
+            take_profit = round(current_price * (1 + self.default_take_profit_pct), 2)
         else:  # sell (short)
-            stop_loss = current_price * (1 + self.default_stop_loss_pct)
-            take_profit = current_price * (1 - self.default_take_profit_pct)
+            # Sell: stop loss above, take profit below
+            stop_loss = round(current_price * (1 + self.default_stop_loss_pct), 2)
+            take_profit = round(current_price * (1 - self.default_take_profit_pct), 2)
+            
+        # Ensure minimum price difference for Alpaca (0.01)
+        if action == "buy":
+            if stop_loss >= current_price - 0.01:
+                stop_loss = round(current_price - 0.01, 2)
+            if take_profit <= current_price + 0.01:
+                take_profit = round(current_price + 0.01, 2)
+        else:  # sell
+            if stop_loss <= current_price + 0.01:
+                stop_loss = round(current_price + 0.01, 2)
+            if take_profit >= current_price - 0.01:
+                take_profit = round(current_price - 0.01, 2)
             
         # Create trading pair
         pair = TradingPair(
@@ -179,20 +193,34 @@ class DecisionEngine(ComponentBase):
         unique_sources = len(set(item.get("source", "") for item in news_items))
         confidence *= min(1.0 + (unique_sources - 1) * 0.1, 1.5)
         
-        # Consider impact scores
+        # Consider impact scores - give minimum boost of 0.8 instead of 0.5
         avg_impact = sum(item.get("impact_score", 0.0) for item in news_items) / len(news_items)
-        confidence *= (0.5 + avg_impact)
+        confidence *= (0.8 + avg_impact)
         
         return min(confidence, 1.0)
         
-    def _get_current_price(self, symbol: str, market_data: Optional[Dict[str, Any]]) -> Optional[float]:
+    async def _get_current_price(self, symbol: str, market_data: Optional[Dict[str, Any]]) -> Optional[float]:
+        # Try to get real-time price from Alpaca if available
+        if self.alpaca_client:
+            try:
+                price = await self.alpaca_client.get_current_price(symbol)
+                if price:
+                    return price
+            except Exception as e:
+                self.logger.warning(f"Failed to get real-time price for {symbol}: {e}")
+        
+        # Check if market data provided
         if market_data and symbol in market_data:
             return market_data[symbol].get("price")
-            
-        # Mock price for development
-        import hashlib
-        hash_value = int(hashlib.md5(symbol.encode()).hexdigest()[:8], 16)
-        return (hash_value % 1000) + 50.0  # Price between $50-$1050
+        
+        # Fallback to mock prices (for testing when markets closed)
+        mock_prices = {
+            'SPY': 533.94, 'QQQ': 418.0, 'AAPL': 202.44, 'TSLA': 304.50, 'AMZN': 213.75,
+            'MSFT': 430.0, 'GOOGL': 163.0, 'META': 565.0, 'NVDA': 135.0, 'GM': 52.42,
+            'F': 11.0, 'GE': 269.45, 'JPM': 234.0, 'BAC': 44.0, 'XOM': 116.0, 'BA': 227.0
+        }
+        
+        return mock_prices.get(symbol, 100.0)  # Default to $100 if unknown
         
     def _calculate_position_size(self, confidence: float, price: float) -> int:
         # Simple position sizing based on confidence

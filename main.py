@@ -60,6 +60,8 @@ class AlgotradingAgent:
         # Initialize trading client
         try:
             self.alpaca_client = AlpacaClient(self.config.get_alpaca_config())
+            # Inject Alpaca client into decision engine for real-time pricing
+            self.decision_engine.alpaca_client = self.alpaca_client
         except Exception as e:
             self.logger.error(f"Failed to initialize Alpaca client: {e}")
             self.logger.info("Running in simulation mode without real trading")
@@ -196,7 +198,7 @@ class AlgotradingAgent:
                 
                 # Step 4: Make trading decisions
                 self.logger.info("Making trading decisions...")
-                trading_pairs = self.decision_engine.process(analyzed_news)
+                trading_pairs = await self.decision_engine.process(analyzed_news)
                 self.logger.info(f"Generated {len(trading_pairs)} trading decisions")
                 
                 if not trading_pairs:

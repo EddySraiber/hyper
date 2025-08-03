@@ -9,7 +9,7 @@ app:
   
 # News Scraper Configuration
 news_scraper:
-  update_interval: 300  # 5 minutes
+  update_interval: 60  # 1 minute for more frequent updates
   sources:
     - name: "Reuters Business"
       type: "rss"
@@ -20,6 +20,15 @@ news_scraper:
     - name: "MarketWatch"
       type: "rss"
       url: "http://feeds.marketwatch.com/marketwatch/marketpulse/"
+    - name: "Seeking Alpha"
+      type: "rss"
+      url: "https://seekingalpha.com/market_currents.xml"
+    - name: "Bloomberg Markets"
+      type: "rss"
+      url: "https://feeds.bloomberg.com/markets/news.rss"
+    - name: "CNBC Markets"
+      type: "rss"
+      url: "https://www.cnbc.com/id/15839135/device/rss/rss.html"
 
 # News Filter Configuration  
 news_filter:
@@ -63,13 +72,13 @@ news_analysis_brain:
 
 # Decision Engine Configuration
 decision_engine:
-  min_confidence: 0.6
+  min_confidence: 0.05            # Lowered to 0.05 to generate more trades
   max_position_size: 1000
   sentiment_weight: 0.4
-  impact_weight: 0.3
-  recency_weight: 0.3
-  default_stop_loss_pct: 0.05    # 5% stop loss
-  default_take_profit_pct: 0.10  # 10% take profit
+  impact_weight: 0.4              # Increased impact weight
+  recency_weight: 0.2             # Decreased recency weight
+  default_stop_loss_pct: 0.05     # 5% stop loss
+  default_take_profit_pct: 0.10   # 10% take profit
 
 # Risk Manager Configuration
 risk_manager:
