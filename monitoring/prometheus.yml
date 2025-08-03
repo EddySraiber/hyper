@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'algotrading-agent'
+    static_configs:
+      - targets: ['algotrading-agent:8080']
