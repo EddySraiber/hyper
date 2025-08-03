@@ -1,0 +1,14 @@
+# Minimal working dependencies
+aiohttp==3.8.6
+feedparser==6.0.10
+textblob==0.17.1
+numpy==1.24.3
+pyyaml==6.0.1
+python-dotenv==1.0.0
+
+# Alpaca Trading (will install compatible pydantic)
+alpaca-py==0.9.0
+
+# Basic utilities
+requests==2.31.0
+python-dateutil==2.8.2
