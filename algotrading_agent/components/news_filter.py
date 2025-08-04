@@ -31,14 +31,21 @@ class NewsFilter(ComponentBase):
                 score = self._calculate_score(item)
                 if score >= self.min_score:
                     item["filter_score"] = score
+                    # Check for breaking news priority
+                    item["priority"] = self._detect_priority(item)
                     filtered_items.append(item)
             except Exception as e:
                 self.logger.error(f"Error filtering item: {e}")
                 
-        # Sort by score (highest first)
-        filtered_items.sort(key=lambda x: x["filter_score"], reverse=True)
+        # Sort by priority first, then by score (breaking news first)
+        filtered_items.sort(key=lambda x: (x["priority"] == "breaking", x["filter_score"]), reverse=True)
         
-        self.logger.info(f"Filtered {len(news_items)} items to {len(filtered_items)}")
+        breaking_count = sum(1 for item in filtered_items if item.get("priority") == "breaking")
+        if breaking_count > 0:
+            self.logger.warning(f"🚨 BREAKING NEWS DETECTED: {breaking_count} high-priority items!")
+        
+        self.logger.info(f"Filtered {len(news_items)} items to {len(filtered_items)} "
+                        f"({breaking_count} breaking)")
         return filtered_items
         
     def _calculate_score(self, item: Dict[str, Any]) -> float:
@@ -111,3 +118,18 @@ class NewsFilter(ComponentBase):
     def _is_blacklisted(self, item: Dict[str, Any]) -> bool:
         text = f"{item.get('title', '')} {item.get('content', '')}".lower()
         return any(blacklisted.lower() in text for blacklisted in self.blacklist)
+        
+    def _detect_priority(self, item: Dict[str, Any]) -> str:
+        """Detect if this is breaking news requiring immediate attention"""
+        text = f"{item.get('title', '')} {item.get('content', '')}".lower()
+        
+        # Check for breaking news patterns
+        for keyword_config in self.keywords:
+            if isinstance(keyword_config, dict):
+                pattern = keyword_config.get("pattern", "")
+                priority = keyword_config.get("priority", "normal")
+                
+                if priority == "breaking" and re.search(pattern, text, re.IGNORECASE):
+                    return "breaking"
+        
+        return "normal"
