@@ -61,6 +61,11 @@ class DecisionEngine(ComponentBase):
         if not self.is_running or not analyzed_news:
             return []
             
+        # Check if market is open before generating any trading decisions
+        if self.alpaca_client and not await self.alpaca_client.is_market_open():
+            self.logger.info("Market is closed - skipping trading decision generation (rest mode)")
+            return []
+            
         trading_pairs = []
         
         # Group news by symbols
@@ -118,18 +123,23 @@ class DecisionEngine(ComponentBase):
         if not current_price:
             return None
             
+        # Check for momentum and adjust targets dynamically
+        adjusted_targets = self._adjust_targets_for_momentum(current_price, signal_strength, news_items)
+        take_profit_pct = adjusted_targets.get("take_profit_pct", self.default_take_profit_pct)
+        stop_loss_pct = adjusted_targets.get("stop_loss_pct", self.default_stop_loss_pct)
+            
         # Calculate position size
         quantity = self._calculate_position_size(confidence, current_price)
         
-        # Set stop loss and take profit with proper rounding for Alpaca requirements
+        # Set stop loss and take profit with dynamic adjustment
         if action == "buy":
             # Buy: stop loss below, take profit above
-            stop_loss = round(current_price * (1 - self.default_stop_loss_pct), 2)
-            take_profit = round(current_price * (1 + self.default_take_profit_pct), 2)
+            stop_loss = round(current_price * (1 - stop_loss_pct), 2)
+            take_profit = round(current_price * (1 + take_profit_pct), 2)
         else:  # sell (short)
             # Sell: stop loss above, take profit below
-            stop_loss = round(current_price * (1 + self.default_stop_loss_pct), 2)
-            take_profit = round(current_price * (1 - self.default_take_profit_pct), 2)
+            stop_loss = round(current_price * (1 + stop_loss_pct), 2)
+            take_profit = round(current_price * (1 - take_profit_pct), 2)
             
         # Ensure minimum price difference for Alpaca (0.01)
         if action == "buy":
@@ -247,3 +257,46 @@ class DecisionEngine(ComponentBase):
             reasoning += f"Key events: {', '.join(unique_events[:3])}."
             
         return reasoning
+        
+    def _adjust_targets_for_momentum(self, current_price: float, signal_strength: float, 
+                                   news_items: List[Dict[str, Any]]) -> Dict[str, float]:
+        """Dynamically adjust take-profit and stop-loss based on momentum and breaking news"""
+        
+        # Default values
+        take_profit_pct = self.default_take_profit_pct
+        stop_loss_pct = self.default_stop_loss_pct
+        
+        # Check for breaking news momentum
+        has_breaking_news = any(item.get("priority") == "breaking" for item in news_items)
+        
+        # Check for high confidence/strong signal
+        strong_signal = abs(signal_strength) > 0.7
+        high_confidence = len(news_items) > 3  # Multiple confirming sources
+        
+        if has_breaking_news:
+            # Breaking news: Increase targets to capture momentum
+            if signal_strength > 0:  # Bullish
+                take_profit_pct *= 1.5  # 10% -> 15% take profit
+                stop_loss_pct *= 0.8    # 5% -> 4% stop loss (tighter)
+                self.logger.info(f"📈 MOMENTUM BOOST: Breaking news detected - "
+                               f"targeting {take_profit_pct*100:.1f}% profit")
+            else:  # Bearish
+                take_profit_pct *= 1.3  # More conservative on short side
+                stop_loss_pct *= 0.9
+                self.logger.info(f"📉 MOMENTUM BOOST: Breaking bearish news - "
+                               f"targeting {take_profit_pct*100:.1f}% profit")
+                
+        elif strong_signal and high_confidence:
+            # Strong signal with multiple sources: Moderate boost
+            take_profit_pct *= 1.2  # 10% -> 12% take profit
+            self.logger.info(f"💪 STRONG SIGNAL: High confidence trade - "
+                           f"targeting {take_profit_pct*100:.1f}% profit")
+            
+        # Safety limits - don't get too greedy
+        take_profit_pct = min(take_profit_pct, 0.25)  # Max 25% target
+        stop_loss_pct = max(stop_loss_pct, 0.02)      # Min 2% stop loss
+        
+        return {
+            "take_profit_pct": take_profit_pct,
+            "stop_loss_pct": stop_loss_pct
+        }

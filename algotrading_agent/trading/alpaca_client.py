@@ -76,10 +76,16 @@ class AlpacaClient:
             return []
             
     async def get_current_price(self, symbol: str) -> Optional[float]:
-        """Get current price for a symbol"""
+        """Get current price for a symbol with timeout protection"""
         try:
             request = StockLatestQuoteRequest(symbol_or_symbols=[symbol])
-            quotes = self.data_client.get_stock_latest_quote(request)
+            
+            # Wrap synchronous API call with timeout protection (10 seconds)
+            quotes = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(
+                    None, self.data_client.get_stock_latest_quote, request
+                ), timeout=10.0
+            )
             
             if symbol in quotes:
                 quote = quotes[symbol]
@@ -87,17 +93,57 @@ class AlpacaClient:
                 return (float(quote.bid_price) + float(quote.ask_price)) / 2
             return None
             
+        except asyncio.TimeoutError:
+            self.logger.warning(f"Timeout getting price for {symbol} - market may be closed")
+            return None
         except Exception as e:
             self.logger.error(f"Error getting price for {symbol}: {e}")
             return None
             
-    async def execute_trading_pair(self, pair: TradingPair) -> Dict[str, Any]:
-        """Execute a trading pair (entry order with stop-loss and take-profit)"""
+    async def execute_trading_pair(self, pair: TradingPair, price_flexibility_pct: float = 0.01) -> Dict[str, Any]:
+        """Execute a trading pair with price flexibility check"""
         try:
-            # Get current price to validate
+            # Get current price to validate and check flexibility bounds
             current_price = await self.get_current_price(pair.symbol)
             if not current_price:
                 raise ValueError(f"Could not get current price for {pair.symbol}")
+            
+            # Check if current price is acceptable (embrace better prices, reject worse ones)
+            target_price = pair.entry_price
+            
+            if pair.action == "buy":
+                # For BUY orders: Accept current price if it's not TOO MUCH HIGHER than target
+                # We're happy to buy cheaper, only reject if too expensive
+                max_acceptable_price = target_price * (1 + price_flexibility_pct)
+                if current_price > max_acceptable_price:
+                    raise ValueError(f"Buy price ${current_price:.2f} too expensive (max: ${max_acceptable_price:.2f})")
+                
+                # Log if we're getting a better deal
+                if current_price < target_price:
+                    savings = target_price - current_price
+                    savings_pct = (savings / target_price) * 100
+                    self.logger.info(f"💰 Better entry price! {pair.symbol} @ ${current_price:.2f} "
+                                   f"(target: ${target_price:.2f}, saving: ${savings:.2f} = {savings_pct:.1f}%)")
+                else:
+                    self.logger.info(f"Price check passed: {pair.symbol} @ ${current_price:.2f} "
+                                   f"(target: ${target_price:.2f}, within +{price_flexibility_pct*100:.1f}%)")
+                    
+            else:  # sell (short)
+                # For SELL orders: Accept current price if it's not TOO MUCH LOWER than target  
+                # We're happy to sell higher, only reject if too low
+                min_acceptable_price = target_price * (1 - price_flexibility_pct)
+                if current_price < min_acceptable_price:
+                    raise ValueError(f"Sell price ${current_price:.2f} too low (min: ${min_acceptable_price:.2f})")
+                
+                # Log if we're getting a better deal  
+                if current_price > target_price:
+                    bonus = current_price - target_price
+                    bonus_pct = (bonus / target_price) * 100
+                    self.logger.info(f"💰 Better exit price! {pair.symbol} @ ${current_price:.2f} "
+                                   f"(target: ${target_price:.2f}, bonus: ${bonus:.2f} = {bonus_pct:.1f}%)")
+                else:
+                    self.logger.info(f"Price check passed: {pair.symbol} @ ${current_price:.2f} "
+                                   f"(target: ${target_price:.2f}, within -{price_flexibility_pct*100:.1f}%)")
                 
             # Create bracket order (entry + stop-loss + take-profit)
             side = OrderSide.BUY if pair.action == "buy" else OrderSide.SELL
@@ -117,8 +163,12 @@ class AlpacaClient:
                 )
             )
             
-            # Submit the order
-            order = self.trading_client.submit_order(order_request)
+            # Submit the order with timeout protection (15 seconds)
+            order = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(
+                    None, self.trading_client.submit_order, order_request
+                ), timeout=15.0
+            )
             
             self.logger.info(f"Submitted bracket order for {pair.symbol}: {order.id}")
             
@@ -133,6 +183,9 @@ class AlpacaClient:
                 "take_profit_price": pair.take_profit
             }
             
+        except asyncio.TimeoutError:
+            self.logger.error(f"Timeout executing order for {pair.symbol} - market may be closed")
+            raise
         except APIError as e:
             self.logger.error(f"Alpaca API error executing {pair.symbol}: {e}")
             raise
@@ -257,11 +310,19 @@ class AlpacaClient:
             self.logger.error(f"Error getting portfolio history: {e}")
             return {}
             
-    def is_market_open(self) -> bool:
-        """Check if market is currently open"""
+    async def is_market_open(self) -> bool:
+        """Check if market is currently open with timeout protection"""
         try:
-            clock = self.trading_client.get_clock()
+            # Wrap synchronous API call with timeout protection (5 seconds)
+            clock = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(
+                    None, self.trading_client.get_clock
+                ), timeout=5.0
+            )
             return clock.is_open
+        except asyncio.TimeoutError:
+            self.logger.warning("Timeout checking market status - assuming market closed")
+            return False
         except Exception as e:
             self.logger.error(f"Error checking market status: {e}")
             return False
@@ -283,7 +344,7 @@ class AlpacaClient:
                 return validation_result
                 
             # Check market hours
-            if not self.is_market_open():
+            if not await self.is_market_open():
                 validation_result["warnings"].append("Market is currently closed")
                 
             # Check account buying power
