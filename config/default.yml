@@ -9,7 +9,7 @@ app:
   
 # News Scraper Configuration
 news_scraper:
-  update_interval: 60  # 1 minute for more frequent updates
+  update_interval: 10  # 10 seconds for news-driven trading speed
   sources:
     - name: "Reuters Business"
       type: "rss"
@@ -43,6 +43,19 @@ news_filter:
       weight: 1.8
     - pattern: "partnership|deal"
       weight: 1.2
+    # Breaking news patterns for immediate trading
+    - pattern: "beats? (estimates?|expectations?)|smashes? (estimates?|expectations?)"
+      weight: 3.0
+      priority: "breaking"
+    - pattern: "misses? (estimates?|expectations?)|disappoints?"
+      weight: 3.0  
+      priority: "breaking"
+    - pattern: "halted|suspended|resumed"
+      weight: 2.5
+      priority: "breaking"
+    - pattern: "breakthrough|major deal|blockbuster"
+      weight: 2.5
+      priority: "breaking"
   blacklist:
     - "celebrity"
     - "sports"
@@ -70,6 +83,13 @@ news_analysis_brain:
     "massive": 0.2
     "significant": 0.15
 
+# News Impact Scorer Configuration
+news_impact_scorer:
+  enable_scoring: true
+  min_impact_threshold: 0.6    # Only process news with impact score >= 0.6
+  learning_enabled: true       # Enable learning from trade outcomes
+  hype_detection: true         # Enable viral/social media hype detection
+
 # Decision Engine Configuration
 decision_engine:
   min_confidence: 0.05            # Lowered to 0.05 to generate more trades
@@ -95,6 +115,15 @@ statistical_advisor:
   min_trades_for_analysis: 10
   lookback_days: 30
   confidence_threshold: 0.6
+
+# Trade Manager Configuration
+trade_manager:
+  polling_interval: 60              # 1 minute polling frequency
+  max_active_trades: 10             # Maximum concurrent trades in queue
+  price_flexibility_pct: 0.01       # 1% price flexibility for market orders
+  trade_timeout_hours: 24           # Cancel trades after 24 hours
+  max_retries: 3                    # Maximum retry attempts for failed orders
+  enable_dynamic_adjustments: true  # Enable stop-loss/take-profit adjustments
 
 # Alpaca API Configuration
 alpaca:

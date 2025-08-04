@@ -8,15 +8,17 @@ import logging
 import signal
 import sys
 from datetime import datetime
-from typing import List
+from typing import List, Dict, Any
 
 from algotrading_agent.config.settings import get_config
 from algotrading_agent.components.news_scraper import NewsScraper
 from algotrading_agent.components.news_filter import NewsFilter
 from algotrading_agent.components.news_analysis_brain import NewsAnalysisBrain
+from algotrading_agent.components.news_impact_scorer import NewsImpactScorer
 from algotrading_agent.components.decision_engine import DecisionEngine
 from algotrading_agent.components.risk_manager import RiskManager
 from algotrading_agent.components.statistical_advisor import StatisticalAdvisor
+from algotrading_agent.components.trade_manager import TradeManager
 from algotrading_agent.trading.alpaca_client import AlpacaClient
 from algotrading_agent.api.health import HealthServer
 
@@ -53,15 +55,20 @@ class AlgotradingAgent:
         self.news_scraper = NewsScraper(self.config.get_component_config('news_scraper'))
         self.news_filter = NewsFilter(self.config.get_component_config('news_filter'))
         self.news_brain = NewsAnalysisBrain(self.config.get_component_config('news_analysis_brain'))
+        self.news_impact_scorer = NewsImpactScorer(self.config.get_component_config('news_impact_scorer'))
         self.decision_engine = DecisionEngine(self.config.get_component_config('decision_engine'))
         self.risk_manager = RiskManager(self.config.get_component_config('risk_manager'))
         self.statistical_advisor = StatisticalAdvisor(self.config.get_component_config('statistical_advisor'))
+        self.trade_manager = TradeManager(self.config.get_component_config('trade_manager'))
         
         # Initialize trading client
         try:
             self.alpaca_client = AlpacaClient(self.config.get_alpaca_config())
-            # Inject Alpaca client into decision engine for real-time pricing
+            # Inject Alpaca client into components that need it
             self.decision_engine.alpaca_client = self.alpaca_client
+            self.trade_manager.alpaca_client = self.alpaca_client
+            # Inject decision engine reference for failure feedback
+            self.trade_manager.decision_engine = self.decision_engine
         except Exception as e:
             self.logger.error(f"Failed to initialize Alpaca client: {e}")
             self.logger.info("Running in simulation mode without real trading")
@@ -74,6 +81,9 @@ class AlgotradingAgent:
         self._last_news = []
         self._last_decisions = []
         self._recent_logs = []
+        
+        # Market status tracking for state transition logging
+        self._last_market_status = None  # Track previous market status for transition logging
             
         self.logger.info("Algotrading Agent initialized")
         
@@ -126,14 +136,21 @@ class AlgotradingAgent:
             await self.news_scraper.start()
             self.news_filter.start()
             self.news_brain.start()
+            self.news_impact_scorer.start()
             self.decision_engine.start()
             self.risk_manager.start()
             self.statistical_advisor.start()
+            self.trade_manager.start()
             
             # Print account info if trading is enabled
             if self.alpaca_client:
-                account_info = await self.alpaca_client.get_account_info()
-                self.logger.info(f"Connected to Alpaca - Portfolio Value: ${account_info['portfolio_value']:,.2f}")
+                try:
+                    account_info = await self.alpaca_client.get_account_info()
+                    self.logger.info(f"Connected to Alpaca - Portfolio Value: ${account_info['portfolio_value']:,.2f}")
+                except Exception as e:
+                    self.logger.warning(f"Alpaca connection failed: {e}")
+                    self.logger.info("Continuing in SIMULATION MODE - no real trading")
+                    self.alpaca_client = None  # Fall back to simulation
                 
             self.logger.info("All components started successfully")
             
@@ -153,9 +170,11 @@ class AlgotradingAgent:
         await self.news_scraper.stop()
         self.news_filter.stop()
         self.news_brain.stop()
+        self.news_impact_scorer.stop()
         self.decision_engine.stop()
         self.risk_manager.stop()
         self.statistical_advisor.stop()
+        self.trade_manager.stop()
         
         # Stop health server
         self.health_server.stop()
@@ -170,7 +189,34 @@ class AlgotradingAgent:
             try:
                 start_time = datetime.utcnow()
                 
-                # Step 1: Scrape news
+                # Check market hours - enter rest mode if markets closed
+                market_open = False
+                if self.alpaca_client:
+                    try:
+                        market_open = await self.alpaca_client.is_market_open()
+                    except Exception as e:
+                        self.logger.warning(f"Could not check market status: {e}")
+                        market_open = False
+                
+                # Log market status transitions (only when status changes)
+                if self._last_market_status != market_open:
+                    if not market_open:
+                        self.logger.info("🛌 ENTERING REST MODE: Markets closed - switching to news analysis only")
+                    else:
+                        self.logger.info("📈 ENTERING ACTIVE MODE: Markets opened - full trading pipeline activated")
+                    self._last_market_status = market_open
+                
+                # Log current mode (less frequent, every 10th iteration in same state)
+                elif hasattr(self, '_status_log_counter'):
+                    self._status_log_counter += 1
+                    if self._status_log_counter >= 10:
+                        status_msg = "REST MODE: Markets closed" if not market_open else "ACTIVE MODE: Markets open"
+                        self.logger.info(f"🔄 {status_msg} (continuing...)")
+                        self._status_log_counter = 0
+                else:
+                    self._status_log_counter = 0
+                
+                # Step 1: Scrape news (always continue - keeps system warm)
                 self.logger.info("Scraping news...")
                 raw_news = await self.news_scraper.process()
                 self.logger.info(f"Scraped {len(raw_news)} news items")
@@ -193,43 +239,83 @@ class AlgotradingAgent:
                 analyzed_news = self.news_brain.process(filtered_news)
                 self.logger.info(f"Analyzed {len(analyzed_news)} news items")
                 
-                # Store news for dashboard
-                self._last_news = analyzed_news[-20:] if analyzed_news else []
+                # Step 3.5: Score news impact potential
+                self.logger.info("Scoring news impact...")
+                scored_news = self.news_impact_scorer.process(analyzed_news)
+                self.logger.info(f"Scored {len(scored_news)} news items for market impact")
                 
-                # Step 4: Make trading decisions
-                self.logger.info("Making trading decisions...")
-                trading_pairs = await self.decision_engine.process(analyzed_news)
-                self.logger.info(f"Generated {len(trading_pairs)} trading decisions")
+                # Log high-impact news summary
+                impact_summary = self.news_impact_scorer.get_impact_summary(scored_news)
+                if impact_summary.get('high_impact_count', 0) > 0:
+                    self.logger.warning(f"🔥 HIGH IMPACT: {impact_summary['high_impact_count']} news items with grade A/B")
+                    for story in impact_summary.get('top_stories', [])[:2]:
+                        self.logger.info(f"  📈 {story['grade']}: {story['title']} (score: {story['score']:.2f})")
                 
-                if not trading_pairs:
-                    await asyncio.sleep(60)
-                    continue
+                # Store news for dashboard (use scored news)
+                self._last_news = scored_news[-20:] if scored_news else []
+                
+                # Skip trading pipeline if markets are closed (rest mode)
+                if not market_open:
+                    self.logger.info("⏸️  Skipping trading pipeline - markets closed")
+                    # Clear previous decisions in rest mode
+                    self._last_decisions = []
+                else:
+                    # Step 4: Make trading decisions using impact-scored news
+                    self.logger.info("Making trading decisions...")
+                    trading_pairs = await self.decision_engine.process(scored_news)
+                    self.logger.info(f"Generated {len(trading_pairs)} trading decisions")
                     
-                # Step 5: Apply statistical insights
-                self.logger.info("Applying statistical insights...")
-                enhanced_pairs = self.statistical_advisor.process(trading_pairs)
-                
-                # Step 6: Risk management
-                self.logger.info("Applying risk management...")
-                approved_pairs = self.risk_manager.process(enhanced_pairs)
-                self.logger.info(f"Risk manager approved {len(approved_pairs)} trades")
-                
-                # Store decisions for dashboard
-                self._last_decisions = approved_pairs[-10:] if approved_pairs else []
-                
-                # Step 7: Execute trades (if Alpaca client is available)
-                if self.alpaca_client and approved_pairs:
-                    await self._execute_trades(approved_pairs)
-                elif approved_pairs:
-                    self._log_simulated_trades(approved_pairs)
+                    if not trading_pairs:
+                        await asyncio.sleep(60)
+                        continue
+                        
+                    # Step 5: Apply statistical insights
+                    self.logger.info("Applying statistical insights...")
+                    enhanced_pairs = self.statistical_advisor.process(trading_pairs)
+                    
+                    # Step 6: Risk management
+                    self.logger.info("Applying risk management...")
+                    approved_pairs = self.risk_manager.process(enhanced_pairs)
+                    self.logger.info(f"Risk manager approved {len(approved_pairs)} trades")
+                    
+                    # Store decisions for dashboard
+                    self._last_decisions = approved_pairs[-10:] if approved_pairs else []
+                    
+                    # Step 7: Execute trades - use express lane for breaking news
+                    if approved_pairs:
+                        # Check if we have breaking news or high-impact news in our scored data
+                        has_breaking_news = any(item.get("priority") == "breaking" for item in scored_news)
+                        has_high_impact = any(item.get("impact_score", 0) >= 1.2 for item in scored_news)
+                        
+                        if has_breaking_news or has_high_impact:
+                            if has_breaking_news:
+                                self.logger.warning("🚀 EXPRESS LANE: Breaking news detected - executing trades immediately!")
+                            else:
+                                self.logger.warning("🔥 EXPRESS LANE: High-impact news detected (score ≥1.2) - executing trades immediately!")
+                            await self._execute_express_trades(approved_pairs, scored_news)
+                        else:
+                            # Normal queue processing
+                            await self._queue_trades(approved_pairs)
+                        
+                # Step 8: Process trade failure feedback (always check, even in rest mode)
+                await self._process_failure_feedback()
                     
                 # Log processing time
                 processing_time = (datetime.utcnow() - start_time).total_seconds()
                 self.logger.info(f"Processing cycle completed in {processing_time:.2f} seconds")
                 
-                # Wait before next iteration
-                update_interval = self.config.get('news_scraper.update_interval', 300)
-                await asyncio.sleep(update_interval)
+                # Wait before next iteration - shorter delay if we're in active trading mode
+                base_interval = self.config.get('news_scraper.update_interval', 300)
+                
+                # Speed up processing when markets are open and active
+                if market_open and self.trade_manager and len(self.trade_manager.active_trades) < 5:
+                    # Faster processing when we have capacity for new trades
+                    processing_interval = max(5, base_interval // 2)  # At least 5 seconds, or half the base
+                    self.logger.debug(f"Active trading mode: processing every {processing_interval}s")
+                else:
+                    processing_interval = base_interval
+                    
+                await asyncio.sleep(processing_interval)
                 
             except KeyboardInterrupt:
                 self.logger.info("Received interrupt signal")
@@ -238,36 +324,147 @@ class AlgotradingAgent:
                 self.logger.error(f"Error in main loop: {e}")
                 await asyncio.sleep(60)  # Wait before retrying
                 
-    async def _execute_trades(self, trading_pairs: List):
-        """Execute approved trading pairs"""
-        self.logger.info(f"Executing {len(trading_pairs)} trades...")
+    async def _queue_trades(self, trading_pairs: List):
+        """Add approved trading pairs to the trade queue for monitoring"""
+        self.logger.info(f"Queueing {len(trading_pairs)} trades for execution and monitoring...")
+        
+        queued_count = 0
+        for pair in trading_pairs:
+            # Add to trade queue
+            if self.trade_manager.add_trade(pair):
+                queued_count += 1
+                
+                # If we have Alpaca client, immediately execute the entry order
+                if self.alpaca_client:
+                    try:
+                        await self._execute_entry_order(pair)
+                    except Exception as e:
+                        self.logger.error(f"Failed to execute entry order for {pair.symbol}: {e}")
+                else:
+                    # Simulation mode - just log the trade
+                    self._log_simulated_trade(pair)
+            else:
+                self.logger.warning(f"Could not queue trade for {pair.symbol} - queue may be full")
+                
+        self.logger.info(f"Successfully queued {queued_count}/{len(trading_pairs)} trades")
+        
+    async def _execute_entry_order(self, pair):
+        """Execute the entry order for a trading pair and link it to the trade queue"""
+        try:
+            # Validate the trade first
+            validation = await self.alpaca_client.validate_trading_pair(pair)
+            
+            if not validation["valid"]:
+                self.logger.warning(f"Trade validation failed for {pair.symbol}: {validation['errors']}")
+                return
+                
+            if validation["warnings"]:
+                self.logger.warning(f"Trade warnings for {pair.symbol}: {validation['warnings']}")
+                
+            # Execute the entry order (bracket order with stop-loss and take-profit)
+            price_flexibility = self.trade_manager.price_flexibility_pct
+            result = await self.alpaca_client.execute_trading_pair(pair, price_flexibility)
+            
+            # Find the corresponding trade in the queue and update with order ID
+            for trade in self.trade_manager.active_trades.values():
+                if (trade.symbol == pair.symbol and 
+                    trade.action == pair.action and 
+                    trade.entry_target_price == pair.entry_price):
+                    trade.entry_order_id = result["order_id"]
+                    break
+                    
+            self.logger.info(f"Entry order submitted: {result}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to execute entry order for {pair.symbol}: {e}")
+            
+    def _log_simulated_trade(self, pair):
+        """Log a single simulated trade"""
+        self.logger.info(
+            f"SIMULATED: {pair.action.upper()} {pair.quantity} shares of {pair.symbol} "
+            f"@ ${pair.entry_price:.2f} | SL: ${pair.stop_loss:.2f} | TP: ${pair.take_profit:.2f} "
+            f"| Confidence: {pair.confidence:.2f} | Reason: {pair.reasoning[:100]}..."
+        )
+        
+    async def _execute_express_trades(self, trading_pairs: List, analyzed_news: List[Dict[str, Any]]):
+        """Execute high-priority trades immediately without normal queue delays"""
+        self.logger.warning(f"🚀 EXPRESS EXECUTION: Processing {len(trading_pairs)} urgent trades")
+        
+        # Log breaking news that triggered express mode
+        breaking_news = [item for item in analyzed_news if item.get("priority") == "breaking"]
+        for news in breaking_news[:3]:  # Log first 3 breaking news items
+            self.logger.warning(f"📰 BREAKING: {news.get('title', 'Unknown')[:100]}...")
         
         for pair in trading_pairs:
-            try:
-                # Validate the trade first
-                validation = await self.alpaca_client.validate_trading_pair(pair)
+            # Add to queue first (for monitoring)
+            if self.trade_manager.add_trade(pair):
+                # Execute immediately - no validation delays for breaking news
+                if self.alpaca_client:
+                    try:
+                        self.logger.info(f"⚡ URGENT EXECUTION: {pair.symbol} {pair.action}")
+                        
+                        # Use higher price flexibility for breaking news (2% instead of 1%)
+                        express_flexibility = self.trade_manager.price_flexibility_pct * 2
+                        result = await self.alpaca_client.execute_trading_pair(pair, express_flexibility)
+                        
+                        # Update trade queue with order ID
+                        for trade in self.trade_manager.active_trades.values():
+                            if (trade.symbol == pair.symbol and 
+                                trade.action == pair.action and 
+                                trade.entry_target_price == pair.entry_price):
+                                trade.entry_order_id = result["order_id"]
+                                break
+                                
+                        self.logger.warning(f"✅ EXPRESS EXECUTED: {result}")
+                        
+                    except Exception as e:
+                        self.logger.error(f"💥 EXPRESS EXECUTION FAILED: {pair.symbol} - {e}")
+                else:
+                    # Simulation mode
+                    self.logger.warning(f"🎯 EXPRESS SIMULATED: {pair.symbol} {pair.action} @ ${pair.entry_price:.2f}")
+            else:
+                self.logger.error(f"Could not queue urgent trade for {pair.symbol} - queue may be full")
                 
-                if not validation["valid"]:
-                    self.logger.warning(f"Trade validation failed for {pair.symbol}: {validation['errors']}")
-                    continue
-                    
-                if validation["warnings"]:
-                    self.logger.warning(f"Trade warnings for {pair.symbol}: {validation['warnings']}")
-                    
-                # Execute the trade
-                result = await self.alpaca_client.execute_trading_pair(pair)
-                self.logger.info(f"Executed trade: {result}")
+        self.logger.warning(f"🏁 EXPRESS LANE COMPLETE: Processed {len(trading_pairs)} urgent trades")
+        
+    async def _process_failure_feedback(self):
+        """Process trade failure feedback and log for future improvements"""
+        if not self.trade_manager:
+            return
+            
+        failures = self.trade_manager.get_failure_feedback()
+        if not failures:
+            return
+            
+        self.logger.info(f"Processing {len(failures)} trade failure reports")
+        
+        for failure in failures:
+            symbol = failure["symbol"]
+            reason = failure["failure_reason"]
+            retry_count = failure["retry_count"]
+            
+            # Log detailed failure information
+            self.logger.warning(
+                f"Trade failure analysis: {symbol} {failure['action']} "
+                f"failed ({reason}) - Retry {retry_count}/{self.trade_manager.max_retries}"
+            )
+            
+            # Future enhancement: Use failures to adjust decision engine parameters
+            # For now, just log the patterns we see
+            if "price" in reason.lower():
+                self.logger.info(f"Price-related failure detected for {symbol} - consider adjusting price flexibility")
+            elif "timeout" in reason.lower():
+                self.logger.info(f"Timeout failure detected for {symbol} - market may be volatile")
+            elif "rejected" in reason.lower():
+                self.logger.info(f"Order rejection for {symbol} - may indicate insufficient funds or invalid parameters")
                 
-                # Update risk manager with new position
-                self.risk_manager.update_position(
-                    pair.symbol,
-                    pair.action,
-                    pair.quantity,
-                    pair.entry_price
-                )
-                
-            except Exception as e:
-                self.logger.error(f"Failed to execute trade for {pair.symbol}: {e}")
+        # Update failure statistics (could be used by statistical advisor)
+        daily_failures = len([f for f in failures 
+                            if datetime.fromisoformat(f["failure_time"]).date() == datetime.utcnow().date()])
+        
+        if daily_failures > 5:  # Configurable threshold
+            self.logger.warning(f"High failure rate detected: {daily_failures} failures today - "
+                              "consider adjusting trading parameters")
                 
     def _log_simulated_trades(self, trading_pairs: List):
         """Log simulated trades when not connected to broker"""
@@ -286,19 +483,26 @@ class AlgotradingAgent:
             'news_scraper': self.news_scraper.get_status(),
             'news_filter': self.news_filter.get_status(),
             'news_brain': self.news_brain.get_status(),
+            'news_impact_scorer': self.news_impact_scorer.get_status(),
             'decision_engine': self.decision_engine.get_status(),
             'risk_manager': self.risk_manager.get_status(),
-            'statistical_advisor': self.statistical_advisor.get_status()
+            'statistical_advisor': self.statistical_advisor.get_status(),
+            'trade_manager': self.trade_manager.get_status()
         }
         
         portfolio_status = {}
         if self.risk_manager:
             portfolio_status = self.risk_manager.get_portfolio_status()
             
+        trade_queue_status = {}
+        if self.trade_manager:
+            trade_queue_status = self.trade_manager.get_queue_status()
+            
         return {
             'running': self.running,
             'components': components_status,
             'portfolio': portfolio_status,
+            'trade_queue': trade_queue_status,
             'timestamp': datetime.utcnow().isoformat()
         }
 
