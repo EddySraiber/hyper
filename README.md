@@ -4,8 +4,16 @@ A modular, news-driven algorithmic trading system built with Python and Docker. 
 
 ## 🚀 Quick Start
 
-Your system is **READY TO RUN** with pre-configured Alpaca paper trading credentials!
+### 1. Setup Environment Variables
+```bash
+# Copy the example environment file
+cp .env.example .env
 
+# Edit .env and add your API keys
+# At minimum, set your Alpaca credentials for paper trading
+```
+
+### 2. Start the Trading System
 ```bash
 # Start the trading agent
 docker-compose up --build
@@ -13,6 +21,8 @@ docker-compose up --build
 # Or run in background
 docker-compose up -d --build
 ```
+
+**⚠️ SECURITY NOTE**: Never commit `.env` files to version control - they contain sensitive API keys!
 
 ## 📊 What It Does
 
