@@ -1,0 +1,167 @@
+{
+  "timestamp": "2025-08-05T14:05:39.448456",
+  "test_categories": {
+    "unit": {
+      "status": "completed",
+      "tests_run": 11,
+      "tests_passed": 11,
+      "tests_failed": 0,
+      "errors": 0,
+      "test_files": [
+        {
+          "file": "tests/unit/test_trading_cost_calculator.py",
+          "status": "completed",
+          "tests_run": 11,
+          "tests_passed": 11,
+          "tests_failed": 0,
+          "errors": 0,
+          "output": "Unknown broker preset: nonexistent_broker\n...........\n----------------------------------------------------------------------\nRan 11 tests in 0.000s\n\nOK\n",
+          "execution_time": 0.043334007263183594,
+          "return_code": 0
+        }
+      ],
+      "execution_time": 0.04334568977355957
+    },
+    "integration": {
+      "status": "completed",
+      "tests_run": 9,
+      "tests_passed": 1,
+      "tests_failed": 8,
+      "errors": 0,
+      "test_files": [
+        {
+          "file": "tests/integration/test_ai_integration.py",
+          "status": "failed",
+          "tests_run": 1,
+          "tests_passed": 0,
+          "tests_failed": 1,
+          "errors": 0,
+          "output": "Traceback (most recent call last):\n  File \"/home/eddy/Hyper/tests/integration/test_ai_integration.py\", line 14, in <module>\n    from algotrading_agent.config.settings import get_config\n  File \"/home/eddy/Hyper/algotrading_agent/config/settings.py\", line 5, in <module>\n    from dotenv import load_dotenv\nModuleNotFoundError: No module named 'dotenv'\n",
+          "execution_time": 0.1217336654663086,
+          "return_code": 1
+        },
+        {
+          "file": "tests/integration/test_groq_integration.py",
+          "status": "failed",
+          "tests_run": 1,
+          "tests_passed": 0,
+          "tests_failed": 1,
+          "errors": 0,
+          "output": "Traceback (most recent call last):\n  File \"/home/eddy/Hyper/tests/integration/test_groq_integration.py\", line 14, in <module>\n    from algotrading_agent.components.ai_analyzer import AIAnalyzer\n  File \"/home/eddy/Hyper/algotrading_agent/components/ai_analyzer.py\", line 2, in <module>\n    import aiohttp\nModuleNotFoundError: No module named 'aiohttp'\n",
+          "execution_time": 0.09714627265930176,
+          "return_code": 1
+        },
+        {
+          "file": "tests/integration/test_simple_correlation.py",
+          "status": "failed",
+          "tests_run": 1,
+          "tests_passed": 0,
+          "tests_failed": 1,
+          "errors": 0,
+          "output": "Traceback (most recent call last):\n  File \"/home/eddy/Hyper/tests/integration/test_simple_correlation.py\", line 17, in <module>\n    from algotrading_agent.components.news_analysis_brain import NewsAnalysisBrain\n  File \"/home/eddy/Hyper/algotrading_agent/components/news_analysis_brain.py\", line 4, in <module>\n    from textblob import TextBlob\nModuleNotFoundError: No module named 'textblob'\n",
+          "execution_time": 0.09434890747070312,
+          "return_code": 1
+        },
+        {
+          "file": "tests/integration/test_news_impact_scoring.py",
+          "status": "failed",
+          "tests_run": 1,
+          "tests_passed": 0,
+          "tests_failed": 1,
+          "errors": 0,
+          "output": "Traceback (most recent call last):\n  File \"/home/eddy/Hyper/tests/integration/test_news_impact_scoring.py\", line 14, in <module>\n    from algotrading_agent.config.settings import get_config\n  File \"/home/eddy/Hyper/algotrading_agent/config/settings.py\", line 5, in <module>\n    from dotenv import load_dotenv\nModuleNotFoundError: No module named 'dotenv'\n",
+          "execution_time": 0.11655330657958984,
+          "return_code": 1
+        },
+        {
+          "file": "tests/integration/test_configurable_ai.py",
+          "status": "failed",
+          "tests_run": 1,
+          "tests_passed": 0,
+          "tests_failed": 1,
+          "errors": 0,
+          "output": "Traceback (most recent call last):\n  File \"/home/eddy/Hyper/tests/integration/test_configurable_ai.py\", line 14, in <module>\n    from algotrading_agent.components.ai_analyzer import AIAnalyzer\n  File \"/home/eddy/Hyper/algotrading_agent/components/ai_analyzer.py\", line 2, in <module>\n    import aiohttp\nModuleNotFoundError: No module named 'aiohttp'\n",
+          "execution_time": 0.10023355484008789,
+          "return_code": 1
+        },
+        {
+          "file": "tests/integration/test_correlation_validator.py",
+          "status": "failed",
+          "tests_run": 1,
+          "tests_passed": 0,
+          "tests_failed": 1,
+          "errors": 0,
+          "output": "Traceback (most recent call last):\n  File \"/home/eddy/Hyper/tests/integration/test_correlation_validator.py\", line 18, in <module>\n    import pandas as pd\nModuleNotFoundError: No module named 'pandas'\n",
+          "execution_time": 0.0941166877746582,
+          "return_code": 1
+        },
+        {
+          "file": "tests/integration/test_validate_enhancements.py",
+          "status": "failed",
+          "tests_run": 1,
+          "tests_passed": 0,
+          "tests_failed": 1,
+          "errors": 0,
+          "output": "Traceback (most recent call last):\n  File \"/home/eddy/Hyper/tests/integration/test_validate_enhancements.py\", line 11, in <module>\n    from algotrading_agent.trading.alpaca_client import AlpacaClient\n  File \"/home/eddy/Hyper/algotrading_agent/trading/alpaca_client.py\", line 5, in <module>\n    from alpaca.trading.client import TradingClient\nModuleNotFoundError: No module named 'alpaca'\n",
+          "execution_time": 0.10077810287475586,
+          "return_code": 1
+        },
+        {
+          "file": "tests/integration/test_trading_costs.py",
+          "status": "passed",
+          "tests_run": 1,
+          "tests_passed": 1,
+          "tests_failed": 0,
+          "errors": 0,
+          "output": "\ud83d\udcb0 Trading Cost Calculator Test\n============================================================\n\n\ud83c\udfe6 Testing: Current (Zero Commission)\n--------------------------------------------------\n\n\ud83d\udcca Small Trade (AAPL):\n   Position: 10 shares @ $150.00\n   Exit: @ $155.00\n   \ud83d\udcb5 Gross P&L: $+50.00\n   \ud83d\udcb0 Total Costs: $0.30\n   \ud83d\udcc8 Net P&L: $+49.70\n   \ud83d\udcca Cost per Share: $0.0300\n   \u26a0\ufe0f  Cost Impact: 0.6% of gross P&L\n   \ud83c\udfaf Breakeven Price: $150.03\n   \u2705 Profitable after costs\n\n\ud83d\udcca Medium Trade (TSLA):\n   Position: 50 shares @ $200.00\n   Exit: @ $190.00\n   \ud83d\udcb5 Gross P&L: $-500.00\n   \ud83d\udcb0 Total Costs: $1.84\n   \ud83d\udcc8 Net P&L: $-501.84\n   \ud83d\udcca Cost per Share: $0.0368\n   \u26a0\ufe0f  Cost Impact: 0.4% of gross P&L\n   \u274c Loss trade (costs make it worse)\n\n\ud83d\udcca Large Trade (SPY):\n   Position: 1000 shares @ $400.00\n   Exit: @ $402.00\n   \ud83d\udcb5 Gross P&L: $+2000.00\n   \ud83d\udcb0 Total Costs: $77.91\n   \ud83d\udcc8 Net P&L: $+1922.09\n   \ud83d\udcca Cost per Share: $0.0779\n   \u26a0\ufe0f  Cost Impact: 3.9% of gross P&L\n   \ud83c\udfaf Breakeven Price: $400.08\n   \u2705 Profitable after costs\n\n\ud83c\udfe6 Testing: Interactive Brokers (Per Share)\n--------------------------------------------------\n\n\ud83d\udcca Small Trade (AAPL):\n   Position: 10 shares @ $150.00\n   Exit: @ $155.00\n   \ud83d\udcb5 Gross P&L: $+50.00\n   \ud83d\udcb0 Total Costs: $2.30\n   \ud83d\udcc8 Net P&L: $+47.70\n   \ud83d\udcca Cost per Share: $0.2300\n   \u26a0\ufe0f  Cost Impact: 4.6% of gross P&L\n   \ud83c\udfaf Breakeven Price: $150.23\n   \u2705 Profitable after costs\n\n\ud83d\udcca Medium Trade (TSLA):\n   Position: 50 shares @ $200.00\n   Exit: @ $190.00\n   \ud83d\udcb5 Gross P&L: $-500.00\n   \ud83d\udcb0 Total Costs: $3.84\n   \ud83d\udcc8 Net P&L: $-503.84\n   \ud83d\udcca Cost per Share: $0.0768\n   \u26a0\ufe0f  Cost Impact: 0.8% of gross P&L\n   \u274c Loss trade (costs make it worse)\n\n\ud83d\udcca Large Trade (SPY):\n   Position: 1000 shares @ $400.00\n   Exit: @ $402.00\n   \ud83d\udcb5 Gross P&L: $+2000.00\n   \ud83d\udcb0 Total Costs: $87.91\n   \ud83d\udcc8 Net P&L: $+1912.09\n   \ud83d\udcca Cost per Share: $0.0879\n   \u26a0\ufe0f  Cost Impact: 4.4% of gross P&L\n   \ud83c\udfaf Breakeven Price: $400.09\n   \u2705 Profitable after costs\n\n\ud83c\udfe6 Testing: Traditional Broker (Per Trade)\n--------------------------------------------------\n\n\ud83d\udcca Small Trade (AAPL):\n   Position: 10 shares @ $150.00\n   Exit: @ $155.00\n   \ud83d\udcb5 Gross P&L: $+50.00\n   \ud83d\udcb0 Total Costs: $20.20\n   \ud83d\udcc8 Net P&L: $+29.80\n   \ud83d\udcca Cost per Share: $2.0200\n   \u26a0\ufe0f  Cost Impact: 40.4% of gross P&L\n   \ud83c\udfaf Breakeven Price: $152.02\n   \u2705 Profitable after costs\n\n\ud83d\udcca Medium Trade (TSLA):\n   Position: 50 shares @ $200.00\n   Exit: @ $190.00\n   \ud83d\udcb5 Gross P&L: $-500.00\n   \ud83d\udcb0 Total Costs: $21.74\n   \ud83d\udcc8 Net P&L: $-521.74\n   \ud83d\udcca Cost per Share: $0.4348\n   \u26a0\ufe0f  Cost Impact: 4.3% of gross P&L\n   \u274c Loss trade (costs make it worse)\n\n\ud83d\udcca Large Trade (SPY):\n   Position: 1000 shares @ $400.00\n   Exit: @ $402.00\n   \ud83d\udcb5 Gross P&L: $+2000.00\n   \ud83d\udcb0 Total Costs: $97.81\n   \ud83d\udcc8 Net P&L: $+1902.19\n   \ud83d\udcca Cost per Share: $0.0978\n   \u26a0\ufe0f  Cost Impact: 4.9% of gross P&L\n   \ud83c\udfaf Breakeven Price: $400.10\n   \u2705 Profitable after costs\n\n\ud83c\udfe6 Testing: Percentage-Based Broker\n--------------------------------------------------\n\n\ud83d\udcca Small Trade (AAPL):\n   Position: 10 shares @ $150.00\n   Exit: @ $155.00\n   \ud83d\udcb5 Gross P&L: $+50.00\n   \ud83d\udcb0 Total Costs: $3.35\n   \ud83d\udcc8 Net P&L: $+46.65\n   \ud83d\udcca Cost per Share: $0.3350\n   \u26a0\ufe0f  Cost Impact: 6.7% of gross P&L\n   \ud83c\udfaf Breakeven Price: $150.34\n   \u2705 Profitable after costs\n\n\ud83d\udcca Medium Trade (TSLA):\n   Position: 50 shares @ $200.00\n   Exit: @ $190.00\n   \ud83d\udcb5 Gross P&L: $-500.00\n   \ud83d\udcb0 Total Costs: $21.34\n   \ud83d\udcc8 Net P&L: $-521.34\n   \ud83d\udcca Cost per Share: $0.4268\n   \u26a0\ufe0f  Cost Impact: 4.3% of gross P&L\n   \u274c Loss trade (costs make it worse)\n\n\ud83d\udcca Large Trade (SPY):\n   Position: 1000 shares @ $400.00\n   Exit: @ $402.00\n   \ud83d\udcb5 Gross P&L: $+2000.00\n   \ud83d\udcb0 Total Costs: $177.91\n   \ud83d\udcc8 Net P&L: $+1822.09\n   \ud83d\udcca Cost per Share: $0.1779\n   \u26a0\ufe0f  Cost Impact: 8.9% of gross P&L\n   \ud83c\udfaf Breakeven Price: $400.18\n   \u2705 Profitable after costs\n\n\ud83d\udccb COMMISSION STRUCTURE COMPARISON\n============================================================\nTrade: 50 TSLA @ $200.00 \u2192 $190.00\nGross P&L: $-500.00\n\n\ud83c\udfc6 Ranking (Best to Worst for this trade):\n1. Current (Zero Commission) Costs: $  1.84  Net P&L: $-501.84\n2. Interactive Brokers (Per Share) Costs: $  3.84  Net P&L: $-503.84\n3. Percentage-Based Broker   Costs: $ 21.34  Net P&L: $-521.34\n4. Traditional Broker (Per Trade) Costs: $ 21.74  Net P&L: $-521.74\n\n\ud83d\udca1 Key Insights:\n   \u2022 Zero commission brokers save $19.90 per round-trip\n   \u2022 High-frequency trading strongly favors zero commission\n   \u2022 Per-share pricing can be better for large trades\n   \u2022 Always factor costs into your profit targets!\n\n\ud83d\udd27 Configuration Examples:\n   Zero Commission (Current): commission_model = 'zero'\n   Per Share: commission_model = 'per_share', per_share_commission = 0.005\n   Per Trade: commission_model = 'per_trade', per_trade_commission = 9.95\n   Percentage: commission_model = 'percentage', percentage_commission = 0.001\n",
+          "execution_time": 0.02654576301574707,
+          "return_code": 0
+        },
+        {
+          "file": "tests/integration/test_openai_integration.py",
+          "status": "failed",
+          "tests_run": 1,
+          "tests_passed": 0,
+          "tests_failed": 1,
+          "errors": 0,
+          "output": "Traceback (most recent call last):\n  File \"/home/eddy/Hyper/tests/integration/test_openai_integration.py\", line 14, in <module>\n    from algotrading_agent.components.ai_analyzer import AIAnalyzer\n  File \"/home/eddy/Hyper/algotrading_agent/components/ai_analyzer.py\", line 2, in <module>\n    import aiohttp\nModuleNotFoundError: No module named 'aiohttp'\n",
+          "execution_time": 0.09629678726196289,
+          "return_code": 1
+        }
+      ],
+      "execution_time": 0.8479318618774414
+    },
+    "regression": {
+      "status": "completed",
+      "tests_run": 1,
+      "tests_passed": 0,
+      "tests_failed": 1,
+      "errors": 0,
+      "test_files": [
+        {
+          "file": "tests/regression/test_regression_suite.py",
+          "status": "failed",
+          "tests_run": 1,
+          "tests_passed": 0,
+          "tests_failed": 1,
+          "errors": 0,
+          "output": "Traceback (most recent call last):\n  File \"/home/eddy/Hyper/tests/regression/test_regression_suite.py\", line 21, in <module>\n    from algotrading_agent.config.settings import get_config\n  File \"/home/eddy/Hyper/tests/regression/../../algotrading_agent/config/settings.py\", line 5, in <module>\n    from dotenv import load_dotenv\nModuleNotFoundError: No module named 'dotenv'\n",
+          "execution_time": 0.10281562805175781,
+          "return_code": 1
+        }
+      ],
+      "execution_time": 0.10283088684082031
+    },
+    "performance": {
+      "status": "skipped",
+      "reason": "no_test_files"
+    }
+  },
+  "summary": {
+    "total_tests": 21,
+    "total_passed": 12,
+    "total_failed": 9,
+    "total_errors": 0,
+    "execution_time": 0.9944062232971191
+  }
+}

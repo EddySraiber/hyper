@@ -186,6 +186,103 @@ alpaca:
   data_url: "https://data.alpaca.markets"
   # API keys should be set via environment variables:
   # ALPACA_API_KEY and ALPACA_SECRET_KEY
+
+# Trading Costs Configuration
+trading_costs:
+  # Paper trading vs live trading
+  paper_trading_costs: false        # Apply costs in paper trading (for realistic backtesting)
+  
+  # Commission structures (choose one)
+  commission_model: "zero"          # Options: "zero", "per_share", "per_trade", "percentage"
+  
+  # Per-trade flat commission (e.g., $1.00 per trade)
+  per_trade_commission: 0.00        # USD per trade (buy or sell)
+  
+  # Per-share commission (e.g., $0.005 per share)  
+  per_share_commission: 0.00        # USD per share
+  per_share_minimum: 0.00           # Minimum commission per trade
+  per_share_maximum: 0.00           # Maximum commission per trade (0 = no cap)
+  
+  # Percentage-based commission (e.g., 0.1% = 0.001)
+  percentage_commission: 0.00       # Percentage of trade value (0.001 = 0.1%)
+  percentage_minimum: 0.00          # Minimum commission per trade
+  percentage_maximum: 0.00          # Maximum commission per trade (0 = no cap)
+  
+  # Additional fees
+  regulatory_fees:
+    # SEC fees (US stocks) - typically 0.0000278 (2.78 per $100k)
+    sec_fee_rate: 0.0000278         # Percentage of sale proceeds (sells only)
+    
+    # FINRA Trading Activity Fee (TAF) - typically 0.000166 (16.6 per $100k)  
+    taf_fee_rate: 0.000166          # Percentage of sale proceeds (sells only)
+    
+    # Other regulatory fees
+    other_regulatory_fees: 0.00     # Fixed amount per trade
+    
+  # Market data fees (if applicable)
+  market_data_fees:
+    enabled: false                  # Apply market data subscription costs
+    monthly_cost: 0.00              # Monthly market data subscription
+    real_time_quotes: 0.00          # Cost per month for real-time quotes
+    
+  # Currency conversion fees (for international stocks)
+  fx_fees:
+    enabled: false                  # Apply FX conversion fees
+    fx_spread_bps: 0                # Basis points spread on FX conversion (100 bps = 1%)
+    fx_minimum: 0.00                # Minimum FX conversion fee
+    
+  # Borrowing costs (for short selling)
+  borrowing_costs:
+    enabled: false                  # Apply borrowing costs for short positions
+    daily_rate: 0.00                # Daily borrowing rate (percentage)
+    minimum_daily_fee: 0.00         # Minimum daily borrowing fee
+    
+  # Common broker presets (uncomment to use)
+  broker_presets:
+    # Alpaca (current) - Commission-free stocks
+    alpaca:
+      per_trade_commission: 0.00
+      sec_fee_rate: 0.0000278
+      taf_fee_rate: 0.000166
+      
+    # Interactive Brokers - Tiered pricing
+    interactive_brokers:
+      commission_model: "per_share"
+      per_share_commission: 0.005   # $0.005 per share
+      per_share_minimum: 1.00       # $1.00 minimum
+      per_share_maximum: 1.00       # 1% of trade value maximum
+      sec_fee_rate: 0.0000278
+      taf_fee_rate: 0.000166
+      
+    # Charles Schwab - Commission-free stocks  
+    schwab:
+      per_trade_commission: 0.00
+      sec_fee_rate: 0.0000278
+      taf_fee_rate: 0.000166
+      
+    # E*TRADE - Commission-free stocks
+    etrade:
+      per_trade_commission: 0.00
+      sec_fee_rate: 0.0000278
+      taf_fee_rate: 0.000166
+      
+    # TD Ameritrade - Commission-free stocks
+    td_ameritrade:
+      per_trade_commission: 0.00
+      sec_fee_rate: 0.0000278
+      taf_fee_rate: 0.000166
+      
+    # Robinhood - Commission-free (but has PFOF)
+    robinhood:
+      per_trade_commission: 0.00
+      # Note: Payment for order flow may result in worse execution prices
+      
+    # Traditional broker example
+    traditional_broker:
+      commission_model: "per_trade"
+      per_trade_commission: 9.95    # $9.95 per trade
+      sec_fee_rate: 0.0000278
+      taf_fee_rate: 0.000166
   
 # Logging Configuration
 logging:
