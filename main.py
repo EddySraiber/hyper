@@ -135,7 +135,7 @@ class AlgotradingAgent:
             # Start all components
             await self.news_scraper.start()
             self.news_filter.start()
-            self.news_brain.start()
+            await self.news_brain.start()
             self.news_impact_scorer.start()
             self.decision_engine.start()
             self.risk_manager.start()
@@ -169,7 +169,7 @@ class AlgotradingAgent:
         # Stop all components
         await self.news_scraper.stop()
         self.news_filter.stop()
-        self.news_brain.stop()
+        await self.news_brain.stop()
         self.news_impact_scorer.stop()
         self.decision_engine.stop()
         self.risk_manager.stop()
@@ -236,7 +236,7 @@ class AlgotradingAgent:
                     
                 # Step 3: Analyze news
                 self.logger.info("Analyzing news...")
-                analyzed_news = self.news_brain.process(filtered_news)
+                analyzed_news = await self.news_brain.process(filtered_news)
                 self.logger.info(f"Analyzed {len(analyzed_news)} news items")
                 
                 # Step 3.5: Score news impact potential

@@ -1,8 +1,10 @@
 import re
+import asyncio
 from typing import List, Dict, Any, Optional
 from textblob import TextBlob
 from datetime import datetime
 from ..core.base import ComponentBase
+from .ai_analyzer import AIAnalyzer
 
 
 class NewsAnalysisBrain(ComponentBase):
@@ -12,31 +14,114 @@ class NewsAnalysisBrain(ComponentBase):
         self.entity_patterns = config.get("entity_patterns", {})
         self.impact_keywords = config.get("impact_keywords", {})
         
-    def start(self) -> None:
+        # Initialize AI analyzer if enabled
+        ai_config = config.get("ai_analyzer", {})
+        self.ai_enabled = ai_config.get("enabled", False)
+        self.ai_weight = ai_config.get("ai_weight", 0.7)
+        self.traditional_weight = ai_config.get("traditional_weight", 0.3)
+        self.ai_analyzer = None
+        if self.ai_enabled:
+            self.ai_analyzer = AIAnalyzer(config)
+        
+    async def start(self) -> None:
         self.logger.info("Starting News Analysis Brain")
+        if self.ai_analyzer:
+            await self.ai_analyzer.start()
+            self.logger.info("AI-enhanced analysis enabled")
         self.is_running = True
         
-    def stop(self) -> None:
+    async def stop(self) -> None:
         self.logger.info("Stopping News Analysis Brain")
+        if self.ai_analyzer:
+            await self.ai_analyzer.stop()
         self.is_running = False
         
-    def process(self, filtered_news: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def process(self, filtered_news: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if not self.is_running or not filtered_news:
             return []
+        
+        # Enhanced AI-powered analysis
+        if self.ai_analyzer:
+            analyzed_items = await self._process_with_ai(filtered_news)
+        else:
+            analyzed_items = await self._process_traditional(filtered_news)
             
+        self.logger.info(f"Analyzed {len(analyzed_items)} news items")
+        return analyzed_items
+        
+    async def _process_with_ai(self, filtered_news: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process news with AI enhancement"""
+        try:
+            # Get AI analysis for all items
+            ai_enhanced_items = await self.ai_analyzer.analyze_news_batch(filtered_news)
+            
+            # Combine AI analysis with traditional analysis
+            final_items = []
+            for item in ai_enhanced_items:
+                # Add traditional analysis as backup/validation
+                traditional_analysis = self._analyze_item_traditional(item)
+                
+                # Merge AI and traditional analysis
+                merged_analysis = self._merge_ai_traditional_analysis(item, traditional_analysis)
+                item.update(merged_analysis)
+                final_items.append(item)
+                
+            self.logger.info(f"AI-enhanced analysis completed for {len(final_items)} items")
+            return final_items
+            
+        except Exception as e:
+            self.logger.error(f"AI analysis failed, falling back to traditional: {e}")
+            return await self._process_traditional(filtered_news)
+            
+    async def _process_traditional(self, filtered_news: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process news with traditional TextBlob analysis"""
         analyzed_items = []
         for item in filtered_news:
             try:
-                analysis = self._analyze_item(item)
+                analysis = self._analyze_item_traditional(item)
                 item.update(analysis)
                 analyzed_items.append(item)
             except Exception as e:
                 self.logger.error(f"Error analyzing item: {e}")
                 
-        self.logger.info(f"Analyzed {len(analyzed_items)} news items")
         return analyzed_items
         
-    def _analyze_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
+    def _merge_ai_traditional_analysis(self, item: Dict[str, Any], traditional: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge AI analysis with traditional analysis for enhanced accuracy"""
+        # AI analysis should already be in the item from ai_analyzer
+        ai_sentiment = item.get('market_sentiment', 0.0)
+        traditional_sentiment = traditional['sentiment']['polarity']
+        
+        # Create enhanced analysis combining both approaches
+        enhanced_analysis = {
+            # Primary analysis from AI
+            'ai_sentiment': ai_sentiment,
+            'ai_confidence': item.get('confidence_score', 0.5),
+            'ai_volatility': item.get('volatility_prediction', 0.5),
+            'ai_time_horizon': item.get('time_horizon', 'hours'),
+            'ai_trading_action': item.get('trading_signals', {}).get('action', 'hold'),
+            'ai_risk_factors': item.get('risk_factors', []),
+            
+            # Traditional analysis as validation
+            'traditional_sentiment': traditional_sentiment,
+            'traditional_confidence': traditional['sentiment']['confidence'],
+            
+            # Combined/weighted analysis (configurable weights)
+            'combined_sentiment': (ai_sentiment * self.ai_weight) + (traditional_sentiment * self.traditional_weight),
+            'analysis_confidence': max(item.get('confidence_score', 0.3), traditional['sentiment']['confidence']),
+            
+            # Keep all traditional fields for backward compatibility
+            'sentiment': traditional['sentiment'],
+            'entities': traditional['entities'], 
+            'events': traditional['events'],
+            'impact_score': max(traditional['impact_score'], item.get('volatility_prediction', 0.0)),
+            'analysis_timestamp': datetime.utcnow().isoformat(),
+            'analysis_method': 'ai_enhanced'
+        }
+        
+        return enhanced_analysis
+        
+    def _analyze_item_traditional(self, item: Dict[str, Any]) -> Dict[str, Any]:
         text = f"{item.get('title', '')} {item.get('content', '')}"
         
         analysis = {

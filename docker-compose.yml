@@ -16,6 +16,10 @@ services:
       - ALPACA_PAPER_TRADING=true
       - ALPACA_API_KEY=${ALPACA_API_KEY}
       - ALPACA_SECRET_KEY=${ALPACA_SECRET_KEY}
+      # AI API Keys (uncomment and set as needed)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     
     # Volumes for data persistence
     volumes:
