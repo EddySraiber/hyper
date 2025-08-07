@@ -362,6 +362,11 @@ class MetricsCollector(ComponentBase):
         """Get current metrics snapshot"""
         return self.current_metrics
     
+    async def collect_metrics(self, agent_ref=None, alpaca_client=None) -> TradingMetrics:
+        """Public method to collect current metrics"""
+        await self._collect_metrics()
+        return self.current_metrics
+    
     def get_metrics_history(self, hours: int = 24) -> List[TradingMetrics]:
         """Get metrics history for specified hours"""
         cutoff_time = datetime.utcnow() - timedelta(hours=hours)

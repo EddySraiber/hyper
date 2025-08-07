@@ -84,6 +84,11 @@ class AlgotradingAgent:
         log_agg_config = self.config.get('observability.log_aggregator', {})
         self.log_aggregator = LogAggregator(log_agg_config)
         
+        # Initialize metrics collector for prometheus export
+        from algotrading_agent.observability.metrics_collector import MetricsCollector
+        metrics_config = self.config.get('observability.metrics_collector', {})
+        self.metrics_collector = MetricsCollector(metrics_config)
+        
         # Initialize health server with dashboard
         self.health_server = HealthServer(port=8080, agent_ref=self)
         
@@ -152,6 +157,9 @@ class AlgotradingAgent:
                 self._structured_handler = StructuredLogHandler(self.log_aggregator)
                 logging.getLogger().addHandler(self._structured_handler)
             
+            # Start metrics collector
+            self.metrics_collector.start()
+            
             # Start all components
             await self.news_scraper.start()
             self.news_filter.start()
@@ -203,6 +211,9 @@ class AlgotradingAgent:
         await self.log_aggregator.stop()
         if self._structured_handler:
             logging.getLogger().removeHandler(self._structured_handler)
+        
+        # Stop metrics collector
+        self.metrics_collector.stop()
         
         self.logger.info("Algotrading Agent stopped")
         
