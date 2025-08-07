@@ -37,6 +37,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._serve_performance()
         elif path == '/api/system-health':
             self._serve_system_health()
+        elif path == '/api/alerts':
+            self._serve_alerts()
+        elif path == '/api/alerts/active':
+            self._serve_active_alerts()
+        elif path == '/api/alerts/stats':
+            self._serve_alert_stats()
+        elif path == '/api/logs/search':
+            self._serve_log_search(parsed_path)
+        elif path == '/api/logs/analytics':
+            self._serve_log_analytics()
+        elif path == '/api/logs/recent':
+            self._serve_recent_logs()
         else:
             self._send_404()
             
@@ -602,6 +614,150 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._send_json(health_data)
         except Exception as e:
             self._send_error(500, f"Error getting system health: {str(e)}")
+    
+    def _serve_alerts(self):
+        """Serve all alerts"""
+        try:
+            alerts_data = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "alerts": []
+            }
+            
+            if self.agent and hasattr(self.agent, 'alert_manager'):
+                alerts_list = list(self.agent.alert_manager.alerts.values())
+                alerts_data["alerts"] = [alert.to_dict() for alert in alerts_list]
+                alerts_data["total_count"] = len(alerts_list)
+            
+            self._send_json(alerts_data)
+        except Exception as e:
+            self._send_error(500, f"Error getting alerts: {str(e)}")
+    
+    def _serve_active_alerts(self):
+        """Serve active (unresolved) alerts"""
+        try:
+            alerts_data = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "active_alerts": []
+            }
+            
+            if self.agent and hasattr(self.agent, 'alert_manager'):
+                active_alerts = self.agent.alert_manager.get_active_alerts()
+                alerts_data["active_alerts"] = [alert.to_dict() for alert in active_alerts]
+                alerts_data["active_count"] = len(active_alerts)
+            
+            self._send_json(alerts_data)
+        except Exception as e:
+            self._send_error(500, f"Error getting active alerts: {str(e)}")
+    
+    def _serve_alert_stats(self):
+        """Serve alert statistics"""
+        try:
+            stats_data = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "stats": {}
+            }
+            
+            if self.agent and hasattr(self.agent, 'alert_manager'):
+                stats_data["stats"] = self.agent.alert_manager.get_alert_stats()
+            
+            self._send_json(stats_data)
+        except Exception as e:
+            self._send_error(500, f"Error getting alert stats: {str(e)}")
+    
+    def _serve_log_search(self, parsed_path):
+        """Serve log search results"""
+        try:
+            query_params = parse_qs(parsed_path.query)
+            
+            # Extract search parameters
+            query = query_params.get('q', [None])[0]
+            level = query_params.get('level', [None])[0]
+            category = query_params.get('category', [None])[0]
+            module = query_params.get('module', [None])[0]
+            symbol = query_params.get('symbol', [None])[0]
+            limit = int(query_params.get('limit', ['100'])[0])
+            
+            # Time range
+            start_time = None
+            end_time = None
+            if 'start_time' in query_params:
+                start_time = datetime.fromisoformat(query_params['start_time'][0])
+            if 'end_time' in query_params:
+                end_time = datetime.fromisoformat(query_params['end_time'][0])
+            
+            search_results = []
+            if self.agent and hasattr(self.agent, 'log_aggregator'):
+                from algotrading_agent.observability.log_aggregator import LogLevel, LogCategory
+                
+                # Convert string parameters to enums
+                level_enum = LogLevel(level.upper()) if level else None
+                category_enum = LogCategory(category.lower()) if category else None
+                
+                results = self.agent.log_aggregator.search_logs(
+                    query=query,
+                    level=level_enum,
+                    category=category_enum,
+                    module=module,
+                    symbol=symbol,
+                    start_time=start_time,
+                    end_time=end_time,
+                    limit=limit
+                )
+                
+                search_results = [log.to_dict() for log in results]
+            
+            response_data = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "query": query,
+                "filters": {
+                    "level": level,
+                    "category": category,
+                    "module": module,
+                    "symbol": symbol,
+                    "start_time": start_time.isoformat() if start_time else None,
+                    "end_time": end_time.isoformat() if end_time else None
+                },
+                "results": search_results,
+                "count": len(search_results)
+            }
+            
+            self._send_json(response_data)
+        except Exception as e:
+            self._send_error(500, f"Error searching logs: {str(e)}")
+    
+    def _serve_log_analytics(self):
+        """Serve log analytics"""
+        try:
+            analytics_data = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "analytics": {}
+            }
+            
+            if self.agent and hasattr(self.agent, 'log_aggregator'):
+                analytics_data["analytics"] = self.agent.log_aggregator.get_log_analytics()
+            
+            self._send_json(analytics_data)
+        except Exception as e:
+            self._send_error(500, f"Error getting log analytics: {str(e)}")
+    
+    def _serve_recent_logs(self):
+        """Serve recent logs from memory"""
+        try:
+            recent_logs_data = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "logs": []
+            }
+            
+            if self.agent and hasattr(self.agent, 'log_aggregator'):
+                with self.agent.log_aggregator.lock:
+                    recent_logs_data["logs"] = [
+                        log.to_dict() for log in list(self.agent.log_aggregator.recent_logs)[-50:]
+                    ]
+                    recent_logs_data["count"] = len(recent_logs_data["logs"])
+            
+            self._send_json(recent_logs_data)
+        except Exception as e:
+            self._send_error(500, f"Error getting recent logs: {str(e)}")
             
     def _handle_config_update(self, path):
         try:

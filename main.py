@@ -21,6 +21,8 @@ from algotrading_agent.components.statistical_advisor import StatisticalAdvisor
 from algotrading_agent.components.trade_manager import TradeManager
 from algotrading_agent.trading.alpaca_client import AlpacaClient
 from algotrading_agent.api.health import HealthServer
+from algotrading_agent.observability.alert_manager import AlertManager
+from algotrading_agent.observability.log_aggregator import LogAggregator, StructuredLogHandler
 
 
 class DashboardLogHandler(logging.Handler):
@@ -74,6 +76,14 @@ class AlgotradingAgent:
             self.logger.info("Running in simulation mode without real trading")
             self.alpaca_client = None
             
+        # Initialize alert manager
+        alert_config = self.config.get_component_config('observability.alerts')
+        self.alert_manager = AlertManager(alert_config)
+        
+        # Initialize log aggregator
+        log_agg_config = self.config.get('observability.log_aggregator', {})
+        self.log_aggregator = LogAggregator(log_agg_config)
+        
         # Initialize health server with dashboard
         self.health_server = HealthServer(port=8080, agent_ref=self)
         
@@ -81,6 +91,7 @@ class AlgotradingAgent:
         self._last_news = []
         self._last_decisions = []
         self._recent_logs = []
+        self._active_alerts = []
         
         # Market status tracking for state transition logging
         self._last_market_status = None  # Track previous market status for transition logging
@@ -111,6 +122,9 @@ class AlgotradingAgent:
         dashboard_handler.setFormatter(formatter)
         logger.addHandler(dashboard_handler)
         
+        # Structured log handler (will be added after log aggregator is initialized)
+        self._structured_handler = None
+        
         # File handler (if configured)
         log_file = logging_config.get('file')
         if log_file:
@@ -131,6 +145,12 @@ class AlgotradingAgent:
         try:
             # Start health server first
             self.health_server.start()
+            
+            # Start log aggregator and add structured logging
+            await self.log_aggregator.start()
+            if not self._structured_handler:
+                self._structured_handler = StructuredLogHandler(self.log_aggregator)
+                logging.getLogger().addHandler(self._structured_handler)
             
             # Start all components
             await self.news_scraper.start()
@@ -178,6 +198,11 @@ class AlgotradingAgent:
         
         # Stop health server
         self.health_server.stop()
+        
+        # Stop log aggregator
+        await self.log_aggregator.stop()
+        if self._structured_handler:
+            logging.getLogger().removeHandler(self._structured_handler)
         
         self.logger.info("Algotrading Agent stopped")
         
@@ -299,6 +324,9 @@ class AlgotradingAgent:
                         
                 # Step 8: Process trade failure feedback (always check, even in rest mode)
                 await self._process_failure_feedback()
+                
+                # Step 9: Evaluate alerts
+                await self._evaluate_alerts()
                     
                 # Log processing time
                 processing_time = (datetime.utcnow() - start_time).total_seconds()
@@ -465,6 +493,72 @@ class AlgotradingAgent:
         if daily_failures > 5:  # Configurable threshold
             self.logger.warning(f"High failure rate detected: {daily_failures} failures today - "
                               "consider adjusting trading parameters")
+
+    async def _evaluate_alerts(self):
+        """Evaluate alert conditions and send notifications"""
+        try:
+            # Gather system metrics for alert evaluation
+            from algotrading_agent.observability.metrics_collector import MetricsCollector
+            metrics_collector = MetricsCollector(self.config.get('observability.metrics_collector', {}))
+            
+            # Collect current metrics
+            metrics = await metrics_collector.collect_metrics(
+                agent_ref=self,
+                alpaca_client=self.alpaca_client
+            )
+            
+            # Convert metrics to dict for alert evaluation
+            alert_data = metrics.to_dict() if hasattr(metrics, 'to_dict') else {}
+            
+            # Add additional context
+            alert_data.update({
+                'failed_components': sum(1 for status in self.get_status()['components'].values() 
+                                       if not status.get('is_running', False)),
+                'consecutive_losses': self._get_consecutive_losses(),
+                'daily_pnl_pct': self._get_daily_pnl_percent(),
+                'cash_pct': self._get_cash_percentage(),
+                'max_position_pct': self._get_max_position_percentage()
+            })
+            
+            # Evaluate alert rules and send notifications
+            triggered_alerts = await self.alert_manager.process_alerts(alert_data)
+            
+            # Update active alerts list for dashboard
+            self._active_alerts = self.alert_manager.get_active_alerts()
+            
+            if triggered_alerts:
+                self.logger.info(f"Alert evaluation completed: {len(triggered_alerts)} alerts triggered")
+            
+        except Exception as e:
+            self.logger.error(f"Error evaluating alerts: {e}")
+    
+    def _get_consecutive_losses(self) -> int:
+        """Get count of consecutive losing trades"""
+        if not hasattr(self, 'trade_manager') or not self.trade_manager:
+            return 0
+        # Implementation would check trade history
+        return 0  # Placeholder
+        
+    def _get_daily_pnl_percent(self) -> float:
+        """Get today's P&L as percentage"""
+        if not hasattr(self, 'risk_manager') or not self.risk_manager:
+            return 0.0
+        portfolio_status = self.risk_manager.get_portfolio_status()
+        return portfolio_status.get('daily_pnl_pct', 0.0)
+        
+    def _get_cash_percentage(self) -> float:
+        """Get cash as percentage of portfolio"""
+        if not hasattr(self, 'risk_manager') or not self.risk_manager:
+            return 100.0
+        portfolio_status = self.risk_manager.get_portfolio_status()
+        return portfolio_status.get('cash_percentage', 100.0)
+        
+    def _get_max_position_percentage(self) -> float:
+        """Get largest single position as percentage of portfolio"""
+        if not hasattr(self, 'risk_manager') or not self.risk_manager:
+            return 0.0
+        portfolio_status = self.risk_manager.get_portfolio_status()
+        return portfolio_status.get('max_position_pct', 0.0)
                 
     def _log_simulated_trades(self, trading_pairs: List):
         """Log simulated trades when not connected to broker"""

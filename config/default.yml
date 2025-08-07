@@ -274,6 +274,58 @@ observability:
     alert_on_high_error_rate: true   # Alert if error rate > 5%
     alert_on_drawdown: true          # Alert if drawdown > 10%
     
+  # Alerting System
+  alerts:
+    enabled: true                    # Enable alert system
+    evaluation_interval: 60          # Evaluate rules every 60 seconds
+    
+    # Alert Channels
+    channels:
+      log:
+        enabled: true
+        level: "WARNING"             # Minimum log level for alerts
+      console: 
+        enabled: true
+        show_in_dashboard: true      # Show alerts in dashboard
+      email:
+        enabled: false
+        smtp_host: "smtp.gmail.com"
+        smtp_port: 587
+        username: ""
+        password: ""
+        from_address: "alerts@algotrading.com"
+        to_addresses: []
+      webhook:
+        enabled: false
+        url: ""
+        timeout: 10
+      slack:
+        enabled: false
+        webhook_url: ""
+        channel: "#trading-alerts"
+    
+    # Alert Thresholds
+    thresholds:
+      max_daily_loss_pct: -2.0           # Alert if daily loss > 2%
+      max_drawdown_pct: 5.0               # Alert if drawdown > 5%
+      max_consecutive_losses: 5           # Alert after 5 consecutive losses
+      high_memory_usage_mb: 800           # Alert if memory > 800MB
+      max_api_error_rate: 0.10            # Alert if error rate > 10%
+      min_cash_balance_pct: 10.0          # Alert if cash < 10%
+      max_position_concentration_pct: 10.0 # Alert if single position > 10%
+    
+  # Log Aggregation & Analysis
+  log_aggregator:
+    enabled: true                    # Enable structured log aggregation
+    db_path: "/app/data/logs.db"     # SQLite database for log storage
+    max_memory_logs: 1000            # Maximum logs kept in memory
+    retention_days: 30               # Days to retain logs in database
+    auto_cleanup: true               # Automatically clean old logs
+    
+    # Log Classification
+    enable_auto_classification: true  # Automatically classify log entries
+    enable_metadata_extraction: true # Extract structured metadata from logs
+    
   # Trading Analytics  
   trading_analytics:
     calculate_sharpe_ratio: true     # Calculate risk-adjusted returns
