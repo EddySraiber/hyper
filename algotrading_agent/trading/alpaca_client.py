@@ -376,3 +376,305 @@ class AlpacaClient:
             validation_result["errors"].append(f"Validation error: {str(e)}")
             
         return validation_result
+        
+    async def update_stop_loss(self, symbol: str, new_stop_price: float, order_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Update stop-loss for an existing position
+        
+        Args:
+            symbol: Stock symbol
+            new_stop_price: New stop-loss price
+            order_id: Specific order ID to update (optional, will find active stop if not provided)
+        
+        Returns:
+            Dictionary with update result
+        """
+        try:
+            # Find the current stop-loss order if order_id not provided
+            if not order_id:
+                orders = await self.get_orders("open")
+                stop_orders = [
+                    order for order in orders 
+                    if order["symbol"] == symbol and "stop" in order.get("order_type", "").lower()
+                ]
+                
+                if not stop_orders:
+                    return {
+                        "success": False,
+                        "error": f"No active stop-loss order found for {symbol}",
+                        "symbol": symbol
+                    }
+                
+                # Use the most recent stop order
+                order_id = stop_orders[0]["order_id"]
+            
+            # Cancel the existing stop order
+            cancel_success = await self.cancel_order(order_id)
+            if not cancel_success:
+                return {
+                    "success": False,
+                    "error": f"Failed to cancel existing stop order {order_id}",
+                    "symbol": symbol
+                }
+            
+            # Get current position to determine quantity and side
+            positions = await self.get_positions()
+            position = next((p for p in positions if p["symbol"] == symbol), None)
+            
+            if not position:
+                return {
+                    "success": False,
+                    "error": f"No position found for {symbol}",
+                    "symbol": symbol
+                }
+            
+            # Create new stop order
+            quantity = abs(position["quantity"])
+            side = OrderSide.SELL if position["quantity"] > 0 else OrderSide.BUY
+            
+            stop_request = MarketOrderRequest(
+                symbol=symbol,
+                qty=quantity,
+                side=side,
+                time_in_force=TimeInForce.GTC,  # Good Till Canceled
+                order_class=OrderClass.SIMPLE,
+                stop_price=new_stop_price
+            )
+            
+            # Submit new stop order with timeout protection
+            new_order = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(
+                    None, self.trading_client.submit_order, stop_request
+                ), timeout=15.0
+            )
+            
+            self.logger.info(f"📈 Updated stop-loss for {symbol}: ${new_stop_price:.2f} (Order: {new_order.id})")
+            
+            return {
+                "success": True,
+                "symbol": symbol,
+                "new_order_id": new_order.id,
+                "old_order_id": order_id,
+                "new_stop_price": new_stop_price,
+                "quantity": quantity,
+                "side": side.value
+            }
+            
+        except asyncio.TimeoutError:
+            return {
+                "success": False,
+                "error": f"Timeout updating stop-loss for {symbol}",
+                "symbol": symbol
+            }
+        except Exception as e:
+            self.logger.error(f"Error updating stop-loss for {symbol}: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "symbol": symbol
+            }
+    
+    async def update_take_profit(self, symbol: str, new_take_profit_price: float, order_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Update take-profit for an existing position
+        
+        Args:
+            symbol: Stock symbol
+            new_take_profit_price: New take-profit price
+            order_id: Specific order ID to update (optional, will find active take-profit if not provided)
+        
+        Returns:
+            Dictionary with update result
+        """
+        try:
+            # Find the current take-profit order if order_id not provided
+            if not order_id:
+                orders = await self.get_orders("open")
+                limit_orders = [
+                    order for order in orders 
+                    if order["symbol"] == symbol and order.get("order_type") == "limit"
+                ]
+                
+                if not limit_orders:
+                    return {
+                        "success": False,
+                        "error": f"No active take-profit order found for {symbol}",
+                        "symbol": symbol
+                    }
+                
+                # Use the most recent limit order (assuming it's take-profit)
+                order_id = limit_orders[0]["order_id"]
+            
+            # Cancel the existing take-profit order
+            cancel_success = await self.cancel_order(order_id)
+            if not cancel_success:
+                return {
+                    "success": False,
+                    "error": f"Failed to cancel existing take-profit order {order_id}",
+                    "symbol": symbol
+                }
+            
+            # Get current position to determine quantity and side
+            positions = await self.get_positions()
+            position = next((p for p in positions if p["symbol"] == symbol), None)
+            
+            if not position:
+                return {
+                    "success": False,
+                    "error": f"No position found for {symbol}",
+                    "symbol": symbol
+                }
+            
+            # Create new limit order for take-profit
+            quantity = abs(position["quantity"])
+            side = OrderSide.SELL if position["quantity"] > 0 else OrderSide.BUY
+            
+            limit_request = LimitOrderRequest(
+                symbol=symbol,
+                qty=quantity,
+                side=side,
+                time_in_force=TimeInForce.GTC,  # Good Till Canceled
+                limit_price=new_take_profit_price
+            )
+            
+            # Submit new take-profit order with timeout protection
+            new_order = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(
+                    None, self.trading_client.submit_order, limit_request
+                ), timeout=15.0
+            )
+            
+            self.logger.info(f"🎯 Updated take-profit for {symbol}: ${new_take_profit_price:.2f} (Order: {new_order.id})")
+            
+            return {
+                "success": True,
+                "symbol": symbol,
+                "new_order_id": new_order.id,
+                "old_order_id": order_id,
+                "new_take_profit_price": new_take_profit_price,
+                "quantity": quantity,
+                "side": side.value
+            }
+            
+        except asyncio.TimeoutError:
+            return {
+                "success": False,
+                "error": f"Timeout updating take-profit for {symbol}",
+                "symbol": symbol
+            }
+        except Exception as e:
+            self.logger.error(f"Error updating take-profit for {symbol}: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "symbol": symbol
+            }
+    
+    async def update_position_parameters(self, symbol: str, new_stop_price: Optional[float] = None, 
+                                       new_take_profit_price: Optional[float] = None) -> Dict[str, Any]:
+        """
+        Update both stop-loss and take-profit for a position
+        
+        Args:
+            symbol: Stock symbol
+            new_stop_price: New stop-loss price (optional)
+            new_take_profit_price: New take-profit price (optional)
+        
+        Returns:
+            Dictionary with update results
+        """
+        results = {
+            "symbol": symbol,
+            "stop_loss_result": None,
+            "take_profit_result": None,
+            "success": True,
+            "errors": []
+        }
+        
+        # Update stop-loss if provided
+        if new_stop_price is not None:
+            stop_result = await self.update_stop_loss(symbol, new_stop_price)
+            results["stop_loss_result"] = stop_result
+            if not stop_result["success"]:
+                results["success"] = False
+                results["errors"].append(f"Stop-loss update failed: {stop_result.get('error')}")
+        
+        # Update take-profit if provided
+        if new_take_profit_price is not None:
+            tp_result = await self.update_take_profit(symbol, new_take_profit_price)
+            results["take_profit_result"] = tp_result
+            if not tp_result["success"]:
+                results["success"] = False
+                results["errors"].append(f"Take-profit update failed: {tp_result.get('error')}")
+        
+        if results["success"]:
+            self.logger.info(f"✅ Successfully updated position parameters for {symbol}")
+        else:
+            self.logger.error(f"❌ Failed to update some parameters for {symbol}: {results['errors']}")
+        
+        return results
+    
+    async def get_position_with_orders(self, symbol: str) -> Dict[str, Any]:
+        """
+        Get detailed position information including associated orders
+        
+        Args:
+            symbol: Stock symbol
+        
+        Returns:
+            Dictionary with position and order details
+        """
+        try:
+            # Get position
+            positions = await self.get_positions()
+            position = next((p for p in positions if p["symbol"] == symbol), None)
+            
+            if not position:
+                return {
+                    "symbol": symbol,
+                    "has_position": False,
+                    "position": None,
+                    "orders": []
+                }
+            
+            # Get associated orders
+            all_orders = await self.get_orders()
+            position_orders = [order for order in all_orders if order["symbol"] == symbol]
+            
+            # Categorize orders
+            stop_orders = [order for order in position_orders if "stop" in order.get("order_type", "").lower()]
+            limit_orders = [order for order in position_orders if order.get("order_type") == "limit"]
+            
+            # Calculate unrealized P&L percentage
+            current_price = await self.get_current_price(symbol)
+            unrealized_pl_pct = position["unrealized_plpc"] if position.get("unrealized_plpc") else 0
+            
+            return {
+                "symbol": symbol,
+                "has_position": True,
+                "position": {
+                    **position,
+                    "current_price": current_price,
+                    "unrealized_pl_pct": unrealized_pl_pct
+                },
+                "orders": {
+                    "stop_loss_orders": stop_orders,
+                    "take_profit_orders": limit_orders,
+                    "all_orders": position_orders
+                },
+                "trailing_eligible": {
+                    "can_trail_up": position["quantity"] > 0 and unrealized_pl_pct > 0,  # Long position in profit
+                    "can_trail_down": position["quantity"] < 0 and unrealized_pl_pct > 0,  # Short position in profit
+                    "current_profit_pct": unrealized_pl_pct
+                }
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error getting position details for {symbol}: {e}")
+            return {
+                "symbol": symbol,
+                "has_position": False,
+                "position": None,
+                "orders": [],
+                "error": str(e)
+            }

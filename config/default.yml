@@ -223,6 +223,35 @@ trade_manager:
   max_retries: 3                    # Maximum retry attempts for failed orders
   enable_dynamic_adjustments: true  # Enable stop-loss/take-profit adjustments
 
+# Trailing Stop Manager Configuration
+trailing_stop_manager:
+  enable_trailing_stops: true       # Enable automatic trailing stop-loss functionality
+  
+  # Default Trailing Settings
+  default_trailing_percent: 3.0     # 3% trailing stop (percentage-based)
+  default_trailing_amount: 0.50     # $0.50 trailing stop (dollar-based alternative)
+  min_profit_threshold: 0.02        # 2% minimum profit before trailing begins
+  
+  # Noise Filtering (Prevent premature exits on small moves)
+  noise_filter_enabled: true        # Enable noise filtering
+  min_move_threshold: 0.01          # 1 cent minimum price move to consider
+  consolidation_period_minutes: 5   # 5 minute consolidation period
+  
+  # Safety Limits
+  max_daily_updates_per_symbol: 10  # Maximum trailing adjustments per symbol per day
+  update_interval: 60               # Check positions every 60 seconds
+  max_concurrent_updates: 5         # Limit concurrent API calls
+  
+  # Risk Management
+  max_trail_distance_percent: 10.0  # Maximum distance to trail (10% of current price)
+  min_trail_distance_percent: 0.5   # Minimum distance to trail (0.5% of current price)
+  enable_weekend_updates: false     # Disable updates during weekends
+  
+  # Performance Settings
+  cache_position_data: true         # Cache position data for performance
+  batch_processing: true            # Process multiple symbols together
+  emergency_stop_enabled: true      # Emergency stop if too many failures
+
 # Alpaca API Configuration
 alpaca:
   paper_trading: true
