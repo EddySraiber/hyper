@@ -3,8 +3,9 @@ import json
 import threading
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
+from typing import Optional, Dict, Any
 
 
 class DashboardHandler(BaseHTTPRequestHandler):
@@ -19,15 +20,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if path == '/health':
             self._serve_health()
         elif path == '/' or path == '/dashboard':
-            self._serve_dashboard()
+            self._serve_modern_dashboard()
+        elif path == '/metrics':
+            self._serve_prometheus_metrics()
+        elif path == '/api/metrics':
+            self._serve_metrics_json()
+        elif path == '/api/trading-summary':
+            self._serve_trading_summary()
         elif path == '/api/portfolio':
             self._serve_portfolio()
-        elif path == '/api/news':
-            self._serve_news()
-        elif path == '/api/decisions':
-            self._serve_decisions()
-        elif path == '/api/logs':
-            self._serve_logs()
+        elif path == '/api/positions':
+            self._serve_positions()
+        elif path == '/api/trailing-stops':
+            self._serve_trailing_stops()
+        elif path == '/api/performance':
+            self._serve_performance()
+        elif path == '/api/system-health':
+            self._serve_system_health()
         else:
             self._send_404()
             
@@ -54,18 +63,303 @@ class DashboardHandler(BaseHTTPRequestHandler):
         
         self.wfile.write(json.dumps(health_data).encode())
         
-    def _serve_dashboard(self):
-        try:
-            dashboard_path = os.path.join(os.path.dirname(__file__), 'dashboard.html')
-            with open(dashboard_path, 'r') as f:
-                content = f.read()
-                
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            self.wfile.write(content.encode())
-        except Exception as e:
-            self._send_error(500, f"Error serving dashboard: {str(e)}")
+    def _serve_modern_dashboard(self):
+        """Serve a modern dashboard with real-time trading metrics"""
+        dashboard_html = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Algorithmic Trading System - Live Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0c1445 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        .status-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 25px;
+            font-size: 0.9rem;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4ade80;
+            box-shadow: 0 0 10px #4ade80;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .metric-card {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(15px);
+            transition: all 0.3s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border-color: rgba(79, 172, 254, 0.5);
+        }
+        .metric-card h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #4facfe;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .metric-label {
+            font-size: 0.85rem;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+        .metric-change {
+            font-size: 0.9rem;
+            padding: 4px 8px;
+            border-radius: 12px;
+            display: inline-block;
+        }
+        .positive { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+        .negative { background: rgba(248, 113, 113, 0.2); color: #f87171; }
+        .neutral { background: rgba(156, 163, 175, 0.2); color: #9ca3af; }
+        .refresh-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+            border: none;
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(79, 172, 254, 0.4);
+            transition: all 0.3s ease;
+        }
+        .refresh-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 15px 40px rgba(79, 172, 254, 0.6);
+        }
+        .last-update {
+            text-align: center;
+            opacity: 0.6;
+            font-size: 0.85rem;
+            margin-top: 20px;
+        }
+        @media (max-width: 768px) {
+            .metrics-grid { grid-template-columns: 1fr; }
+            .status-indicators { flex-direction: column; align-items: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 Algorithmic Trading System</h1>
+        <div class="status-indicators">
+            <div class="status-item">
+                <div class="status-dot"></div>
+                System Online
+            </div>
+            <div class="status-item" id="market-status">
+                <div class="status-dot"></div>
+                <span id="market-text">Market Status</span>
+            </div>
+            <div class="status-item" id="trades-status">
+                <div class="status-dot"></div>
+                <span id="trades-text">Trading Active</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="metrics-grid" id="metrics-container">
+        <!-- Metrics will be populated by JavaScript -->
+    </div>
+
+    <div class="last-update" id="last-update">
+        Loading metrics...
+    </div>
+
+    <button class="refresh-btn" onclick="loadMetrics()" title="Refresh Data">
+        ⟳
+    </button>
+
+    <script>
+        async function loadMetrics() {
+            try {
+                const response = await fetch('/api/trading-summary');
+                const data = await response.json();
+                displayMetrics(data);
+                document.getElementById('last-update').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+            } catch (error) {
+                console.error('Error loading metrics:', error);
+                document.getElementById('last-update').textContent = `Error loading data: ${error.message}`;
+            }
+        }
+
+        function displayMetrics(data) {
+            const container = document.getElementById('metrics-container');
+            container.innerHTML = '';
+
+            // Performance Metrics
+            if (data.performance) {
+                const perfCard = createMetricCard('📈 Trading Performance', [
+                    { label: 'Total Trades', value: data.performance.total_trades, type: 'number' },
+                    { label: 'Win Rate', value: data.performance.win_rate, type: 'percentage' },
+                    { label: 'Total P&L', value: data.performance.total_pnl, type: 'currency' },
+                    { label: 'Profit Factor', value: data.performance.profit_factor, type: 'number' }
+                ]);
+                container.appendChild(perfCard);
+            }
+
+            // Portfolio Metrics
+            if (data.portfolio) {
+                const portfolioCard = createMetricCard('💼 Portfolio Status', [
+                    { label: 'Portfolio Value', value: data.portfolio.value, type: 'currency' },
+                    { label: 'Available Cash', value: data.portfolio.cash, type: 'currency' },
+                    { label: 'Active Positions', value: data.portfolio.positions, type: 'number' },
+                    { label: 'Long/Short', value: `${data.portfolio.long_positions}/${data.portfolio.short_positions}`, type: 'text' }
+                ]);
+                container.appendChild(portfolioCard);
+            }
+
+            // Risk Metrics
+            if (data.risk) {
+                const riskCard = createMetricCard('⚠️ Risk Management', [
+                    { label: 'Current Drawdown', value: data.risk.current_drawdown, type: 'percentage' },
+                    { label: 'Max Drawdown', value: data.risk.max_drawdown, type: 'percentage' },
+                    { label: 'Risk Utilization', value: data.risk.risk_utilization, type: 'percentage' }
+                ]);
+                container.appendChild(riskCard);
+            }
+
+            // System Health
+            if (data.system) {
+                const systemCard = createMetricCard('🖥️ System Health', [
+                    { label: 'Uptime', value: data.system.uptime, type: 'text' },
+                    { label: 'Memory Usage', value: data.system.memory_usage, type: 'text' },
+                    { label: 'API Response', value: data.system.api_response_time, type: 'text' },
+                    { label: 'Error Rate', value: data.system.error_rate, type: 'percentage' }
+                ]);
+                container.appendChild(systemCard);
+            }
+
+            // Enhanced Features
+            if (data.enhanced_features) {
+                const enhancedCard = createMetricCard('🚀 Enhanced Features', [
+                    { label: 'Trailing Stops Active', value: data.enhanced_features.trailing_stops_active, type: 'number' },
+                    { label: 'Enhanced Signals', value: data.enhanced_features.enhanced_signals, type: 'number' },
+                    { label: 'AI Success Rate', value: data.enhanced_features.ai_success_rate, type: 'percentage' }
+                ]);
+                container.appendChild(enhancedCard);
+            }
+        }
+
+        function createMetricCard(title, metrics) {
+            const card = document.createElement('div');
+            card.className = 'metric-card';
+            
+            let content = `<h3>${title}</h3>`;
+            metrics.forEach(metric => {
+                const valueClass = getValueClass(metric.value, metric.type);
+                content += `
+                    <div style="margin-bottom: 15px;">
+                        <div class="metric-label">${metric.label}</div>
+                        <div class="metric-value ${valueClass}">${formatValue(metric.value, metric.type)}</div>
+                    </div>
+                `;
+            });
+            
+            card.innerHTML = content;
+            return card;
+        }
+
+        function formatValue(value, type) {
+            if (typeof value === 'string') return value;
+            
+            switch (type) {
+                case 'currency':
+                    return value.replace(/[$,]/g, '') ? value : '$0.00';
+                case 'percentage':
+                    return value.includes('%') ? value : value + '%';
+                case 'number':
+                    return value.toString();
+                default:
+                    return value;
+            }
+        }
+
+        function getValueClass(value, type) {
+            if (type === 'percentage' || type === 'currency') {
+                const numValue = parseFloat(value.toString().replace(/[%$,]/g, ''));
+                return numValue > 0 ? 'positive' : numValue < 0 ? 'negative' : 'neutral';
+            }
+            return '';
+        }
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadMetrics, 30000);
+
+        // Initial load
+        loadMetrics();
+    </script>
+</body>
+</html>'''
+        
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.send_header('Cache-Control', 'no-cache')
+        self.end_headers()
+        self.wfile.write(dashboard_html.encode())
             
     def _serve_portfolio(self):
         try:
@@ -116,16 +410,198 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._send_error(500, f"Error getting decisions: {str(e)}")
             
-    def _serve_logs(self):
+    def _serve_prometheus_metrics(self):
+        """Serve Prometheus-compatible metrics"""
         try:
-            # Get recent logs from agent if available
-            logs_data = []
-            if self.agent and hasattr(self.agent, '_recent_logs'):
-                logs_data = getattr(self.agent, '_recent_logs', [])
-                
-            self._send_json(logs_data[-50:])  # Last 50 logs
+            metrics_text = "# HELP trading_system_metrics Trading system metrics\n"
+            metrics_text += "# TYPE trading_system_up gauge\n"
+            metrics_text += "trading_system_up 1\n"
+            
+            # Get metrics from metrics collector if available
+            if self.agent and hasattr(self.agent, 'metrics_collector'):
+                prometheus_data = self.agent.metrics_collector.get_prometheus_metrics()
+                if prometheus_data:
+                    metrics_text = prometheus_data
+            
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.send_header('Cache-Control', 'no-cache')
+            self.end_headers()
+            self.wfile.write(metrics_text.encode())
         except Exception as e:
-            self._send_error(500, f"Error getting logs: {str(e)}")
+            self._send_error(500, f"Error getting metrics: {str(e)}")
+    
+    def _serve_metrics_json(self):
+        """Serve metrics in JSON format"""
+        try:
+            metrics_data = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "system": "online",
+                "metrics": {}
+            }
+            
+            if self.agent and hasattr(self.agent, 'metrics_collector'):
+                current_metrics = self.agent.metrics_collector.get_current_metrics()
+                metrics_data["metrics"] = current_metrics.to_prometheus_metrics()
+            
+            self._send_json(metrics_data)
+        except Exception as e:
+            self._send_error(500, f"Error getting metrics JSON: {str(e)}")
+    
+    def _serve_trading_summary(self):
+        """Serve comprehensive trading summary for dashboard"""
+        try:
+            summary_data = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "performance": {
+                    "total_trades": 0,
+                    "win_rate": "0.0%",
+                    "total_pnl": "$0.00",
+                    "profit_factor": "0.00"
+                },
+                "portfolio": {
+                    "value": "$100,000.00",
+                    "cash": "$100,000.00", 
+                    "positions": 0,
+                    "long_positions": 0,
+                    "short_positions": 0
+                },
+                "risk": {
+                    "current_drawdown": "0.0%",
+                    "max_drawdown": "0.0%",
+                    "risk_utilization": "0.0%"
+                },
+                "system": {
+                    "uptime": "0.0h",
+                    "memory_usage": "0.0MB",
+                    "api_response_time": "0ms",
+                    "error_rate": "0.00%"
+                },
+                "enhanced_features": {
+                    "trailing_stops_active": 0,
+                    "enhanced_signals": 0,
+                    "ai_success_rate": "0.0%"
+                }
+            }
+            
+            # Get real data from metrics collector if available
+            if self.agent and hasattr(self.agent, 'metrics_collector'):
+                trading_summary = self.agent.metrics_collector.get_trading_summary()
+                summary_data.update(trading_summary)
+            
+            self._send_json(summary_data)
+        except Exception as e:
+            self._send_error(500, f"Error getting trading summary: {str(e)}")
+    
+    def _serve_positions(self):
+        """Serve current positions with detailed information"""
+        try:
+            positions_data = []
+            
+            if self.agent and hasattr(self.agent, 'alpaca_client'):
+                # Get detailed positions from Alpaca client
+                import asyncio
+                try:
+                    positions = asyncio.run(self.agent.alpaca_client.get_positions())
+                    for pos in positions:
+                        symbol = pos["symbol"]
+                        
+                        # Get detailed position info if available
+                        try:
+                            detailed_pos = asyncio.run(
+                                self.agent.alpaca_client.get_position_with_orders(symbol)
+                            )
+                            positions_data.append(detailed_pos)
+                        except:
+                            positions_data.append(pos)
+                            
+                except Exception as e:
+                    self.logger.warning(f"Error getting positions: {e}")
+            
+            self._send_json(positions_data)
+        except Exception as e:
+            self._send_error(500, f"Error getting positions: {str(e)}")
+    
+    def _serve_trailing_stops(self):
+        """Serve trailing stops status"""
+        try:
+            trailing_data = {}
+            
+            if self.agent and hasattr(self.agent, 'trailing_stop_manager'):
+                trailing_data = self.agent.trailing_stop_manager.get_trailing_stop_status()
+            
+            self._send_json(trailing_data)
+        except Exception as e:
+            self._send_error(500, f"Error getting trailing stops: {str(e)}")
+    
+    def _serve_performance(self):
+        """Serve performance metrics over time"""
+        try:
+            performance_data = {
+                "daily_pnl": [],
+                "win_rate_history": [],
+                "drawdown_history": [],
+                "trade_count_history": []
+            }
+            
+            if self.agent and hasattr(self.agent, 'metrics_collector'):
+                # Get last 24 hours of metrics
+                history = self.agent.metrics_collector.get_metrics_history(24)
+                
+                for metrics in history:
+                    timestamp = metrics.timestamp.isoformat()
+                    performance_data["daily_pnl"].append({
+                        "timestamp": timestamp,
+                        "value": metrics.total_pnl
+                    })
+                    performance_data["win_rate_history"].append({
+                        "timestamp": timestamp,
+                        "value": metrics.win_rate()
+                    })
+                    performance_data["drawdown_history"].append({
+                        "timestamp": timestamp,
+                        "value": metrics.current_drawdown * 100
+                    })
+                    performance_data["trade_count_history"].append({
+                        "timestamp": timestamp,
+                        "value": metrics.total_trades
+                    })
+            
+            self._send_json(performance_data)
+        except Exception as e:
+            self._send_error(500, f"Error getting performance data: {str(e)}")
+    
+    def _serve_system_health(self):
+        """Serve detailed system health information"""
+        try:
+            health_data = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "overall_status": "healthy",
+                "components": {},
+                "alerts": []
+            }
+            
+            if self.agent:
+                # Check component health
+                components = [
+                    'news_scraper', 'news_filter', 'news_analysis_brain', 
+                    'decision_engine', 'risk_manager', 'metrics_collector',
+                    'trailing_stop_manager'
+                ]
+                
+                for component_name in components:
+                    if hasattr(self.agent, component_name):
+                        component = getattr(self.agent, component_name)
+                        if hasattr(component, 'is_running'):
+                            status = "running" if component.is_running else "stopped"
+                            health_data["components"][component_name] = {
+                                "status": status,
+                                "last_updated": getattr(component, 'last_updated', datetime.utcnow()).isoformat()
+                            }
+            
+            self._send_json(health_data)
+        except Exception as e:
+            self._send_error(500, f"Error getting system health: {str(e)}")
             
     def _handle_config_update(self, path):
         try:

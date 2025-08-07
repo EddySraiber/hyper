@@ -252,6 +252,35 @@ trailing_stop_manager:
   batch_processing: true            # Process multiple symbols together
   emergency_stop_enabled: true      # Emergency stop if too many failures
 
+# Observability & Metrics Configuration
+observability:
+  # Metrics Collection
+  metrics_collector:
+    collection_interval: 30          # Collect metrics every 30 seconds
+    history_retention_hours: 168     # Keep 1 week of history
+    enable_prometheus_export: true   # Enable Prometheus metrics endpoint
+    prometheus_port: 9090            # Port for Prometheus scraping
+    
+  # Dashboard & API
+  dashboard:
+    enable_modern_dashboard: true    # Enable new observability dashboard
+    auto_refresh_seconds: 30         # Dashboard auto-refresh interval
+    show_enhanced_features: true     # Show trailing stops, AI metrics, etc.
+    
+  # Performance Monitoring
+  performance:
+    track_api_response_times: true   # Monitor API call performance
+    track_memory_usage: true         # Monitor system memory usage
+    alert_on_high_error_rate: true   # Alert if error rate > 5%
+    alert_on_drawdown: true          # Alert if drawdown > 10%
+    
+  # Trading Analytics  
+  trading_analytics:
+    calculate_sharpe_ratio: true     # Calculate risk-adjusted returns
+    calculate_profit_factor: true    # Calculate gross profit/loss ratio
+    track_win_rate: true             # Track percentage of winning trades
+    track_avg_trade_duration: true   # Track average time in positions
+
 # Alpaca API Configuration
 alpaca:
   paper_trading: true
