@@ -47,6 +47,13 @@ class DecisionEngine(ComponentBase):
         self.default_stop_loss_pct = config.get("default_stop_loss_pct", 0.05)
         self.default_take_profit_pct = config.get("default_take_profit_pct", 0.10)
         self.alpaca_client = None  # Will be injected by main app
+        self.news_impact_scorer = None  # Will be injected by main app for enhanced analysis
+        
+        # Enhanced parameters for temporal and context analysis
+        self.temporal_weight = config.get("temporal_weight", 0.2)  # Weight for temporal dynamics
+        self.strength_correlation_weight = config.get("strength_correlation_weight", 0.15)  # Weight for strength correlation  
+        self.market_context_weight = config.get("market_context_weight", 0.15)  # Weight for market context
+        self.enable_enhanced_analysis = config.get("enable_enhanced_analysis", True)  # Toggle for enhanced features
         
     def start(self) -> None:
         self.logger.info("Starting Decision Engine")
@@ -172,6 +179,9 @@ class DecisionEngine(ComponentBase):
         total_signal = 0.0
         total_weight = 0.0
         
+        # Extract symbols for enhanced analysis
+        symbols = self._extract_symbols_from_news(news_items)
+        
         for item in news_items:
             sentiment = item.get("sentiment", {})
             impact_score = item.get("impact_score", 0.0)
@@ -180,16 +190,76 @@ class DecisionEngine(ComponentBase):
             # Calculate weighted signal
             sentiment_score = sentiment.get("polarity", 0.0)
             
-            weight = (
+            # Base weight calculation (traditional approach)
+            base_weight = (
                 impact_score * self.impact_weight +
                 filter_score * self.recency_weight +
                 sentiment.get("confidence", 0.0) * self.sentiment_weight
             )
             
-            total_signal += sentiment_score * weight
-            total_weight += weight
+            # Enhanced analysis if enabled and scorer available
+            enhanced_weight = 0.0
+            if self.enable_enhanced_analysis and self.news_impact_scorer:
+                enhanced_weight = self._calculate_enhanced_weight(item, sentiment_score, symbols)
+            
+            # Combine traditional and enhanced weights
+            total_item_weight = base_weight + enhanced_weight
+            
+            total_signal += sentiment_score * total_item_weight
+            total_weight += total_item_weight
             
         return total_signal / max(total_weight, 0.001)
+    
+    def _extract_symbols_from_news(self, news_items: List[Dict[str, Any]]) -> List[str]:
+        """Extract all symbols mentioned in the news items"""
+        symbols = []
+        for item in news_items:
+            entities = item.get("entities", {})
+            tickers = entities.get("tickers", [])
+            symbols.extend(tickers)
+        return list(set(symbols))  # Remove duplicates
+    
+    def _calculate_enhanced_weight(self, item: Dict[str, Any], sentiment_score: float, symbols: List[str]) -> float:
+        """Calculate enhanced weight using temporal dynamics, strength correlation, and market context"""
+        try:
+            enhanced_weight = 0.0
+            
+            # 1. Temporal dynamics analysis
+            temporal_dynamics = self.news_impact_scorer.calculate_temporal_dynamics(
+                item, abs(sentiment_score)
+            )
+            temporal_multiplier = temporal_dynamics.get('temporal_multiplier', 1.0)
+            enhanced_weight += temporal_multiplier * self.temporal_weight
+            
+            # 2. Strength correlation analysis
+            hype_score = item.get('hype_score', 0.0) or self._estimate_hype_score(item)
+            strength_correlation = self.news_impact_scorer.calculate_strength_correlation(
+                sentiment_score, hype_score, symbols
+            )
+            strength_score = strength_correlation.get('overall_strength_score', 0.5)
+            enhanced_weight += strength_score * self.strength_correlation_weight
+            
+            # 3. Market context analysis
+            market_context = self.news_impact_scorer.calculate_market_context(item, symbols)
+            context_multiplier = market_context.get('context_multiplier', 1.0)
+            enhanced_weight += context_multiplier * self.market_context_weight
+            
+            return enhanced_weight
+            
+        except Exception as e:
+            self.logger.warning(f"Error in enhanced weight calculation: {e}")
+            return 0.0  # Fallback to no enhanced weight
+    
+    def _estimate_hype_score(self, item: Dict[str, Any]) -> float:
+        """Estimate hype score from content if not already calculated"""
+        content = f"{item.get('title', '')} {item.get('content', '')}".lower()
+        
+        # Look for hype indicators
+        hype_words = ['breaking', 'urgent', 'massive', 'huge', 'explosive', 'surge', 'plunge', 
+                     'record', 'unprecedented', 'shocking', 'dramatic']
+        
+        hype_count = sum(1 for word in hype_words if word in content)
+        return min(hype_count * 0.2, 1.0)  # Cap at 1.0
         
     def _calculate_confidence(self, news_items: List[Dict[str, Any]], 
                             signal_strength: float) -> float:
@@ -207,7 +277,60 @@ class DecisionEngine(ComponentBase):
         avg_impact = sum(item.get("impact_score", 0.0) for item in news_items) / len(news_items)
         confidence *= (0.8 + avg_impact)
         
+        # Enhanced confidence boost from temporal dynamics and market context
+        if self.enable_enhanced_analysis and self.news_impact_scorer:
+            confidence = self._apply_enhanced_confidence_boost(confidence, news_items)
+        
         return min(confidence, 1.0)
+    
+    def _apply_enhanced_confidence_boost(self, base_confidence: float, news_items: List[Dict[str, Any]]) -> float:
+        """Apply enhanced confidence boost based on temporal and market context analysis"""
+        try:
+            total_temporal_boost = 0.0
+            total_context_boost = 0.0
+            symbols = self._extract_symbols_from_news(news_items)
+            
+            for item in news_items:
+                sentiment_score = item.get("sentiment", {}).get("polarity", 0.0)
+                
+                # 1. Temporal dynamics boost
+                temporal_dynamics = self.news_impact_scorer.calculate_temporal_dynamics(
+                    item, abs(sentiment_score)
+                )
+                
+                # Fresh breaking news gets significant confidence boost
+                if temporal_dynamics.get('hype_window', {}).get('type') == 'flash':
+                    total_temporal_boost += 0.15  # 15% boost for flash news
+                elif temporal_dynamics.get('age_hours', 24) < 1:
+                    total_temporal_boost += 0.10  # 10% boost for very recent news
+                
+                # 2. Market context boost
+                market_context = self.news_impact_scorer.calculate_market_context(item, symbols)
+                
+                # Strong sector momentum gets confidence boost
+                sector_analysis = market_context.get('sector_analysis', {})
+                if sector_analysis.get('dominant_sector'):
+                    total_context_boost += 0.08  # 8% boost for sector-specific news
+                
+                # Market regime alignment boost
+                market_regime = market_context.get('market_regime', {})
+                if market_regime.get('regime') in ['bull_market', 'bear_market']:
+                    # Regime-aligned sentiment gets boost
+                    if ((sentiment_score > 0 and market_regime.get('regime') == 'bull_market') or
+                        (sentiment_score < 0 and market_regime.get('regime') == 'bear_market')):
+                        total_context_boost += 0.05  # 5% boost for regime alignment
+            
+            # Apply boosts (average across all news items)
+            avg_temporal_boost = total_temporal_boost / len(news_items)
+            avg_context_boost = total_context_boost / len(news_items)
+            
+            # Apply boosts multiplicatively but cap the total enhancement
+            enhanced_confidence = base_confidence * (1 + avg_temporal_boost + avg_context_boost)
+            return min(enhanced_confidence, base_confidence * 1.3)  # Max 30% boost
+            
+        except Exception as e:
+            self.logger.warning(f"Error in enhanced confidence calculation: {e}")
+            return base_confidence
         
     async def _get_current_price(self, symbol: str, market_data: Optional[Dict[str, Any]]) -> Optional[float]:
         # Try to get real-time price from Alpaca if available
@@ -260,18 +383,19 @@ class DecisionEngine(ComponentBase):
         
     def _adjust_targets_for_momentum(self, current_price: float, signal_strength: float, 
                                    news_items: List[Dict[str, Any]]) -> Dict[str, float]:
-        """Dynamically adjust take-profit and stop-loss based on momentum and breaking news"""
+        """Dynamically adjust take-profit and stop-loss based on momentum, breaking news, and enhanced analysis"""
         
         # Default values
         take_profit_pct = self.default_take_profit_pct
         stop_loss_pct = self.default_stop_loss_pct
         
-        # Check for breaking news momentum
+        # Traditional checks
         has_breaking_news = any(item.get("priority") == "breaking" for item in news_items)
-        
-        # Check for high confidence/strong signal
         strong_signal = abs(signal_strength) > 0.7
-        high_confidence = len(news_items) > 3  # Multiple confirming sources
+        high_confidence = len(news_items) > 3
+        
+        # Enhanced analysis adjustments
+        enhanced_adjustments = self._get_enhanced_target_adjustments(news_items, signal_strength)
         
         if has_breaking_news:
             # Breaking news: Increase targets to capture momentum
@@ -291,6 +415,18 @@ class DecisionEngine(ComponentBase):
             take_profit_pct *= 1.2  # 10% -> 12% take profit
             self.logger.info(f"💪 STRONG SIGNAL: High confidence trade - "
                            f"targeting {take_profit_pct*100:.1f}% profit")
+        
+        # Apply enhanced adjustments
+        if enhanced_adjustments:
+            take_profit_multiplier = enhanced_adjustments.get('take_profit_multiplier', 1.0)
+            stop_loss_multiplier = enhanced_adjustments.get('stop_loss_multiplier', 1.0)
+            volatility_adjustment = enhanced_adjustments.get('volatility_adjustment', 1.0)
+            
+            take_profit_pct *= take_profit_multiplier
+            stop_loss_pct *= stop_loss_multiplier * volatility_adjustment
+            
+            if enhanced_adjustments.get('reasoning'):
+                self.logger.info(f"🎯 ENHANCED TARGETING: {enhanced_adjustments['reasoning']}")
             
         # Safety limits - don't get too greedy
         take_profit_pct = min(take_profit_pct, 0.25)  # Max 25% target
@@ -300,3 +436,78 @@ class DecisionEngine(ComponentBase):
             "take_profit_pct": take_profit_pct,
             "stop_loss_pct": stop_loss_pct
         }
+    
+    def _get_enhanced_target_adjustments(self, news_items: List[Dict[str, Any]], signal_strength: float) -> Optional[Dict[str, Any]]:
+        """Get enhanced target adjustments based on temporal dynamics and market context"""
+        if not (self.enable_enhanced_analysis and self.news_impact_scorer and news_items):
+            return None
+            
+        try:
+            symbols = self._extract_symbols_from_news(news_items)
+            total_volatility_factor = 0.0
+            total_temporal_factor = 0.0
+            reasoning_parts = []
+            
+            for item in news_items:
+                sentiment_score = item.get("sentiment", {}).get("polarity", 0.0)
+                hype_score = item.get('hype_score', 0.0) or self._estimate_hype_score(item)
+                
+                # 1. Strength correlation analysis for volatility expectations
+                strength_correlation = self.news_impact_scorer.calculate_strength_correlation(
+                    sentiment_score, hype_score, symbols
+                )
+                
+                volatility_info = strength_correlation.get('volatility_patterns', {})
+                volatility_level = volatility_info.get('volatility_level', 'weak')
+                volatility_multiplier = volatility_info.get('volatility_multiplier', 1.0)
+                total_volatility_factor += volatility_multiplier
+                
+                # 2. Temporal dynamics for momentum persistence
+                temporal_dynamics = self.news_impact_scorer.calculate_temporal_dynamics(
+                    item, abs(sentiment_score)
+                )
+                
+                hype_window = temporal_dynamics.get('hype_window', {})
+                hype_type = hype_window.get('type', 'short')
+                temporal_multiplier = temporal_dynamics.get('temporal_multiplier', 1.0)
+                total_temporal_factor += temporal_multiplier
+                
+                # Build reasoning
+                if volatility_level in ['strong', 'extreme']:
+                    reasoning_parts.append(f"{volatility_level} volatility expected")
+                if hype_type in ['flash', 'long']:
+                    reasoning_parts.append(f"{hype_type}-term momentum")
+            
+            # Calculate average factors
+            avg_volatility_factor = total_volatility_factor / len(news_items)
+            avg_temporal_factor = total_temporal_factor / len(news_items)
+            
+            # Convert to target adjustments
+            take_profit_multiplier = 1.0
+            stop_loss_multiplier = 1.0
+            
+            # High volatility = wider targets to capture moves
+            if avg_volatility_factor > 2.0:  # Strong/extreme volatility
+                take_profit_multiplier = 1.3  # 30% wider profit targets
+                stop_loss_multiplier = 1.2    # 20% wider stop loss
+                reasoning_parts.append("wide targets for volatility")
+            elif avg_volatility_factor > 1.5:  # Moderate volatility  
+                take_profit_multiplier = 1.15  # 15% wider profit targets
+                stop_loss_multiplier = 1.1     # 10% wider stop loss
+                
+            # Strong temporal momentum = tighter stops, wider profits
+            if avg_temporal_factor > 1.0:
+                take_profit_multiplier *= 1.1  # Extra profit capture
+                stop_loss_multiplier *= 0.9    # Tighter stops for momentum
+                reasoning_parts.append("momentum-optimized")
+            
+            return {
+                'take_profit_multiplier': min(take_profit_multiplier, 1.5),  # Max 50% boost
+                'stop_loss_multiplier': max(stop_loss_multiplier, 0.8),      # Max 20% tighter
+                'volatility_adjustment': min(avg_volatility_factor / 2.0, 1.3),  # Volatility-based adjustment
+                'reasoning': ', '.join(reasoning_parts) if reasoning_parts else None
+            }
+            
+        except Exception as e:
+            self.logger.warning(f"Error in enhanced target adjustments: {e}")
+            return None

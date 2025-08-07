@@ -143,6 +143,33 @@ news_impact_scorer:
   min_impact_threshold: 0.6    # Only process news with impact score >= 0.6
   learning_enabled: true       # Enable learning from trade outcomes
   hype_detection: true         # Enable viral/social media hype detection
+  
+  # Enhanced Temporal Dynamics Parameters
+  enhanced_temporal_analysis: true    # Enable temporal dynamics analysis
+  hype_duration_tracking: true        # Track how long sentiment momentum lasts
+  peak_detection_windows: true        # Analyze peak impact timing windows
+  decay_pattern_analysis: true        # Analyze how fast hype influence fades
+  
+  # Enhanced Strength Correlation Parameters  
+  strength_correlation_analysis: true # Enable sentiment-to-price velocity mapping
+  volume_correlation_tracking: true   # Track hype-to-volume correlations
+  volatility_pattern_prediction: true # Predict volatility based on sentiment strength
+  
+  # Enhanced Market Context Parameters
+  sector_momentum_analysis: true      # Analyze sector-specific hype responses
+  market_regime_detection: true       # Detect bull/bear market impact on hype
+  time_of_day_analysis: true          # Analyze time-of-day impact effectiveness
+  
+  # Tuning Parameters for Enhanced Analysis
+  temporal_weight: 0.3                # Weight for temporal dynamics in scoring (0.0-1.0)
+  strength_weight: 0.25               # Weight for strength correlation in scoring (0.0-1.0)
+  market_context_weight: 0.2          # Weight for market context in scoring (0.0-1.0)
+  traditional_weight: 0.25            # Weight for traditional impact scoring (0.0-1.0)
+  
+  # Performance Optimization
+  cache_enhanced_calculations: true   # Cache expensive calculations
+  batch_enhanced_analysis: true       # Process enhanced analysis in batches
+  max_enhanced_items_per_batch: 50    # Maximum items per enhanced analysis batch
 
 # Decision Engine Configuration
 decision_engine:
@@ -153,6 +180,23 @@ decision_engine:
   recency_weight: 0.2             # Decreased recency weight
   default_stop_loss_pct: 0.05     # 5% stop loss
   default_take_profit_pct: 0.10   # 10% take profit
+  
+  # Enhanced Analysis Integration
+  enable_enhanced_analysis: true   # Enable enhanced NewsImpactScorer integration
+  temporal_weight: 0.2             # Weight for temporal dynamics in decision making
+  strength_correlation_weight: 0.15 # Weight for strength correlation analysis
+  market_context_weight: 0.15     # Weight for market context analysis
+  
+  # Enhanced Target Adjustment Parameters
+  enable_dynamic_targeting: true   # Enable enhanced target adjustment based on volatility/momentum
+  max_take_profit_boost: 1.5       # Maximum take-profit multiplier (1.5 = 50% boost)
+  max_stop_loss_tightening: 0.8    # Minimum stop-loss multiplier (0.8 = 20% tighter)
+  volatility_adjustment_factor: 1.3 # Maximum volatility-based adjustment factor
+  
+  # Momentum and Breaking News Sensitivity
+  breaking_news_multiplier: 1.5    # Multiplier for breaking news momentum
+  strong_signal_threshold: 0.7     # Threshold for considering signal "strong"
+  high_confidence_source_count: 3  # Number of sources needed for "high confidence"
 
 # Risk Manager Configuration
 risk_manager:

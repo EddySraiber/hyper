@@ -99,12 +99,137 @@ class NewsImpactScorer(ComponentBase):
             'stale': 0.6              # Old news (>24 hours)
         }
         
-        # Hype amplification indicators
+        # Enhanced Temporal Dynamics Parameters
+        self.temporal_dynamics = {
+            # Hype duration tracking (how long sentiment momentum lasts)
+            'hype_duration_windows': {
+                'flash': {'max_hours': 1, 'decay_factor': 0.9},      # Flash news - quick impact
+                'short': {'max_hours': 4, 'decay_factor': 0.7},      # Short-term momentum
+                'medium': {'max_hours': 24, 'decay_factor': 0.5},    # Daily cycle
+                'long': {'max_hours': 72, 'decay_factor': 0.3}       # Multi-day impact
+            },
+            
+            # Peak impact detection windows (when maximum price impact occurs)
+            'peak_detection_windows': {
+                'immediate': {'hours': 0.25, 'weight': 1.0},        # 15 minutes
+                'short_term': {'hours': 1, 'weight': 0.9},          # 1 hour
+                'medium_term': {'hours': 4, 'weight': 0.7},         # 4 hours  
+                'daily': {'hours': 24, 'weight': 0.5},              # 1 day
+                'extended': {'hours': 72, 'weight': 0.3}            # 3 days
+            },
+            
+            # Decay pattern analysis (how fast hype influence fades)
+            'decay_patterns': {
+                'exponential': {'formula': 'exp(-t/tau)', 'tau': 2.0},    # Fast exponential decay
+                'linear': {'formula': 'max(0, 1-t/max_t)', 'max_t': 12.0}, # Linear decay
+                'step': {'formula': 'step_function', 'thresholds': [1, 4, 12, 24]} # Step decay
+            }
+        }
+        
+        # Enhanced Hype amplification indicators
         self.hype_indicators = {
             'viral_words': ['trending', 'viral', 'exploding', 'rocket', 'moon', 'massive surge'],
             'urgency_words': ['urgent', 'breaking', 'alert', 'flash', 'just in'],
             'social_buzz': ['twitter', 'reddit', 'social media', 'viral', 'trending'],
             'hype_weight': 1.3
+        }
+        
+        # Strength Correlation Parameters
+        self.strength_correlation = {
+            # Sentiment magnitude vs price velocity mapping
+            'magnitude_velocity': {
+                'weak': {'sentiment_range': [0.1, 0.3], 'expected_velocity': 0.5},      # Slow moves
+                'moderate': {'sentiment_range': [0.3, 0.6], 'expected_velocity': 1.0},  # Normal moves
+                'strong': {'sentiment_range': [0.6, 0.8], 'expected_velocity': 2.0},    # Fast moves
+                'extreme': {'sentiment_range': [0.8, 1.0], 'expected_velocity': 3.0}    # Very fast moves
+            },
+            
+            # Volume correlation indicators (high hype → trading volume spikes)
+            'volume_correlation': {
+                'multipliers': {
+                    'low_hype': 1.0,      # Normal volume
+                    'medium_hype': 2.5,   # 2.5x volume spike
+                    'high_hype': 5.0,     # 5x volume spike  
+                    'viral_hype': 10.0    # 10x volume spike
+                },
+                'hype_thresholds': [0.3, 0.6, 0.8]  # Thresholds for hype levels
+            },
+            
+            # Volatility pattern indicators (strong hype → higher price swings)
+            'volatility_patterns': {
+                'baseline_volatility': 0.02,  # 2% baseline daily volatility
+                'hype_multipliers': {
+                    'weak': 1.2,    # 20% increase in volatility
+                    'moderate': 1.8,  # 80% increase
+                    'strong': 2.5,    # 150% increase
+                    'extreme': 4.0    # 300% increase
+                },
+                'momentum_persistence': {
+                    'short': 2,   # 2 hours of elevated volatility
+                    'medium': 8,  # 8 hours
+                    'long': 24    # 24 hours
+                }
+            }
+        }
+        
+        # Market Context Parameters
+        self.market_context = {
+            # Sector momentum differences (tech vs energy vs finance hype response)
+            'sector_momentum': {
+                'technology': {
+                    'symbols': ['AAPL', 'MSFT', 'GOOGL', 'META', 'NVDA', 'TSLA'],
+                    'hype_multiplier': 1.4,  # Tech responds strongly to hype
+                    'keywords': ['AI', 'artificial intelligence', 'cloud', 'software', 'tech'],
+                    'volatility_factor': 1.6
+                },
+                'energy': {
+                    'symbols': ['XOM', 'CVX', 'COP', 'SLB', 'MPC'],
+                    'hype_multiplier': 0.8,  # Energy less sensitive to hype
+                    'keywords': ['oil', 'gas', 'energy', 'drilling', 'refining'],
+                    'volatility_factor': 1.2
+                },
+                'finance': {
+                    'symbols': ['JPM', 'BAC', 'WFC', 'C', 'GS'],
+                    'hype_multiplier': 1.1,  # Moderate hype sensitivity
+                    'keywords': ['bank', 'finance', 'loan', 'credit', 'fed'],
+                    'volatility_factor': 1.3
+                },
+                'healthcare': {
+                    'symbols': ['JNJ', 'PFE', 'UNH', 'ABBV', 'MRK'],
+                    'hype_multiplier': 1.2,
+                    'keywords': ['drug', 'medicine', 'healthcare', 'FDA', 'clinical'],
+                    'volatility_factor': 1.4
+                }
+            },
+            
+            # Market regime detection (bull vs bear market hype effectiveness)
+            'market_regime': {
+                'bull_market': {
+                    'positive_hype_multiplier': 1.3,  # Positive news amplified in bull market
+                    'negative_hype_multiplier': 0.7,  # Negative news dampened
+                    'risk_appetite': 'high'
+                },
+                'bear_market': {
+                    'positive_hype_multiplier': 0.8,  # Positive news dampened in bear market
+                    'negative_hype_multiplier': 1.4,  # Negative news amplified
+                    'risk_appetite': 'low'
+                },
+                'neutral_market': {
+                    'positive_hype_multiplier': 1.0,  # Normal response
+                    'negative_hype_multiplier': 1.0,
+                    'risk_appetite': 'moderate'
+                }
+            },
+            
+            # Time-of-day impact (morning vs afternoon news effectiveness)
+            'time_of_day_impact': {
+                'market_open': {'hours': [9, 10], 'multiplier': 1.5},    # 9-10 AM high impact
+                'morning_session': {'hours': [10, 12], 'multiplier': 1.3}, # 10-12 PM strong
+                'lunch_time': {'hours': [12, 14], 'multiplier': 0.8},     # 12-2 PM weaker
+                'afternoon_session': {'hours': [14, 16], 'multiplier': 1.1}, # 2-4 PM moderate
+                'market_close': {'hours': [16, 17], 'multiplier': 1.4},   # 4-5 PM high impact
+                'after_hours': {'hours': [17, 20], 'multiplier': 1.2}     # 5-8 PM moderate
+            }
         }
         
     def start(self) -> None:
@@ -323,6 +448,445 @@ class NewsImpactScorer(ComponentBase):
         else:
             return 'F'   # Minimal impact
             
+    def calculate_temporal_dynamics(self, item: Dict[str, Any], sentiment_strength: float = 0.0) -> Dict[str, Any]:
+        """Calculate temporal dynamics including hype duration, peak detection, and decay patterns"""
+        published_obj = item.get('published') or item.get('timestamp', '')
+        current_time = datetime.utcnow()
+        
+        if not published_obj:
+            return self._get_default_temporal_dynamics()
+            
+        try:
+            # Parse timestamp
+            if isinstance(published_obj, datetime):
+                published = published_obj
+            elif isinstance(published_obj, str):
+                if 'T' in published_obj:
+                    published = datetime.fromisoformat(published_obj.replace('Z', '+00:00'))
+                else:
+                    published = datetime.fromisoformat(published_obj)
+            else:
+                return self._get_default_temporal_dynamics()
+            
+            age_hours = (current_time - published.replace(tzinfo=None)).total_seconds() / 3600
+            
+            # Determine hype duration window
+            hype_window = self._determine_hype_window(item, sentiment_strength)
+            
+            # Calculate peak detection timing
+            peak_detection = self._calculate_peak_detection_window(age_hours, sentiment_strength)
+            
+            # Calculate decay pattern
+            decay_info = self._calculate_decay_pattern(age_hours, sentiment_strength)
+            
+            return {
+                'age_hours': age_hours,
+                'hype_window': hype_window,
+                'peak_detection': peak_detection,
+                'decay_info': decay_info,
+                'temporal_multiplier': self._get_temporal_multiplier(age_hours, hype_window, decay_info)
+            }
+            
+        except Exception as e:
+            self.logger.warning(f"Error calculating temporal dynamics: {e}")
+            return self._get_default_temporal_dynamics()
+    
+    def _determine_hype_window(self, item: Dict[str, Any], sentiment_strength: float) -> Dict[str, Any]:
+        """Determine appropriate hype duration window based on content analysis"""
+        content = f"{item.get('title', '')} {item.get('content', '')}".lower()
+        
+        # Check for flash indicators (breaking news, urgent alerts)
+        flash_indicators = ['breaking', 'urgent', 'flash', 'alert', 'just in', 'developing']
+        if any(indicator in content for indicator in flash_indicators):
+            return {'type': 'flash', **self.temporal_dynamics['hype_duration_windows']['flash']}
+        
+        # Check for high-impact keywords indicating longer momentum
+        long_indicators = ['acquisition', 'merger', 'breakthrough', 'revolutionary', 'partnership']
+        if any(indicator in content for indicator in long_indicators) or sentiment_strength > 0.7:
+            return {'type': 'long', **self.temporal_dynamics['hype_duration_windows']['long']}
+        
+        # Medium-term for moderate sentiment
+        if sentiment_strength > 0.4:
+            return {'type': 'medium', **self.temporal_dynamics['hype_duration_windows']['medium']}
+        
+        # Default to short-term
+        return {'type': 'short', **self.temporal_dynamics['hype_duration_windows']['short']}
+    
+    def _calculate_peak_detection_window(self, age_hours: float, sentiment_strength: float) -> Dict[str, Any]:
+        """Calculate which peak detection window applies and expected impact timing"""
+        for window_name, window_config in self.temporal_dynamics['peak_detection_windows'].items():
+            if age_hours <= window_config['hours']:
+                # Adjust weight based on sentiment strength
+                adjusted_weight = window_config['weight'] * (1 + sentiment_strength * 0.3)
+                return {
+                    'window': window_name,
+                    'base_weight': window_config['weight'],
+                    'adjusted_weight': min(adjusted_weight, 1.5),  # Cap at 1.5x
+                    'hours_threshold': window_config['hours']
+                }
+        
+        # If past all windows, use extended with reduced weight
+        return {
+            'window': 'expired',
+            'base_weight': 0.1,
+            'adjusted_weight': 0.1,
+            'hours_threshold': 72
+        }
+    
+    def _calculate_decay_pattern(self, age_hours: float, sentiment_strength: float) -> Dict[str, Any]:
+        """Calculate decay pattern and current decay multiplier"""
+        # Choose decay pattern based on sentiment strength
+        if sentiment_strength > 0.8:
+            pattern = 'linear'  # Strong sentiment decays more slowly
+        elif sentiment_strength > 0.4:
+            pattern = 'exponential'  # Moderate sentiment has exponential decay
+        else:
+            pattern = 'step'  # Weak sentiment has step decay
+        
+        decay_config = self.temporal_dynamics['decay_patterns'][pattern]
+        
+        if pattern == 'exponential':
+            tau = decay_config['tau']
+            decay_multiplier = math.exp(-age_hours / tau)
+        elif pattern == 'linear':
+            max_t = decay_config['max_t']
+            decay_multiplier = max(0, 1 - age_hours / max_t)
+        else:  # step
+            thresholds = decay_config['thresholds']
+            if age_hours <= thresholds[0]:
+                decay_multiplier = 1.0
+            elif age_hours <= thresholds[1]:
+                decay_multiplier = 0.8
+            elif age_hours <= thresholds[2]:
+                decay_multiplier = 0.5
+            elif age_hours <= thresholds[3]:
+                decay_multiplier = 0.2
+            else:
+                decay_multiplier = 0.1
+        
+        return {
+            'pattern': pattern,
+            'decay_multiplier': max(decay_multiplier, 0.05),  # Minimum 5% retention
+            'config': decay_config
+        }
+    
+    def _get_temporal_multiplier(self, age_hours: float, hype_window: Dict, decay_info: Dict) -> float:
+        """Calculate overall temporal multiplier combining all factors"""
+        # Base multiplier from hype window
+        base_multiplier = hype_window.get('decay_factor', 0.5)
+        
+        # Apply decay
+        decay_multiplier = decay_info['decay_multiplier']
+        
+        # Combine with age-based adjustment
+        if age_hours < 1:
+            age_boost = 1.2  # Recent news boost
+        elif age_hours < 4:
+            age_boost = 1.0  # Normal
+        else:
+            age_boost = 0.8  # Older news penalty
+        
+        return base_multiplier * decay_multiplier * age_boost
+    
+    def _get_default_temporal_dynamics(self) -> Dict[str, Any]:
+        """Return default temporal dynamics when calculation fails"""
+        return {
+            'age_hours': 24,  # Assume 24 hours old
+            'hype_window': {'type': 'medium', **self.temporal_dynamics['hype_duration_windows']['medium']},
+            'peak_detection': {'window': 'extended', 'base_weight': 0.3, 'adjusted_weight': 0.3},
+            'decay_info': {'pattern': 'exponential', 'decay_multiplier': 0.5},
+            'temporal_multiplier': 0.5
+        }
+
+    def calculate_strength_correlation(self, sentiment_score: float, hype_score: float, market_symbols: List[str] = None) -> Dict[str, Any]:
+        """Calculate strength correlation metrics between sentiment and expected market impact"""
+        
+        # 1. Sentiment magnitude to velocity mapping
+        velocity_info = self._get_sentiment_velocity_mapping(sentiment_score)
+        
+        # 2. Volume correlation based on hype
+        volume_info = self._calculate_volume_correlation(hype_score, sentiment_score)
+        
+        # 3. Volatility pattern prediction
+        volatility_info = self._calculate_volatility_patterns(sentiment_score, hype_score)
+        
+        # 4. Symbol-specific adjustments
+        symbol_adjustments = self._calculate_symbol_adjustments(market_symbols, sentiment_score) if market_symbols else {}
+        
+        return {
+            'velocity_mapping': velocity_info,
+            'volume_correlation': volume_info, 
+            'volatility_patterns': volatility_info,
+            'symbol_adjustments': symbol_adjustments,
+            'overall_strength_score': self._calculate_overall_strength_score(velocity_info, volume_info, volatility_info)
+        }
+    
+    def _get_sentiment_velocity_mapping(self, sentiment_score: float) -> Dict[str, Any]:
+        """Map sentiment magnitude to expected price velocity"""
+        abs_sentiment = abs(sentiment_score)
+        
+        for strength_level, config in self.strength_correlation['magnitude_velocity'].items():
+            min_range, max_range = config['sentiment_range']
+            if min_range <= abs_sentiment <= max_range:
+                return {
+                    'strength_level': strength_level,
+                    'expected_velocity': config['expected_velocity'],
+                    'sentiment_magnitude': abs_sentiment,
+                    'direction': 'positive' if sentiment_score > 0 else 'negative'
+                }
+        
+        # Default to weak if outside ranges
+        return {
+            'strength_level': 'weak',
+            'expected_velocity': 0.5,
+            'sentiment_magnitude': abs_sentiment,
+            'direction': 'positive' if sentiment_score > 0 else 'negative'
+        }
+    
+    def _calculate_volume_correlation(self, hype_score: float, sentiment_score: float) -> Dict[str, Any]:
+        """Calculate expected volume correlation based on hype levels"""
+        combined_hype = (hype_score + abs(sentiment_score)) / 2
+        thresholds = self.strength_correlation['volume_correlation']['hype_thresholds']
+        multipliers = self.strength_correlation['volume_correlation']['multipliers']
+        
+        if combined_hype >= thresholds[2]:  # >= 0.8
+            hype_level = 'viral_hype'
+        elif combined_hype >= thresholds[1]:  # >= 0.6
+            hype_level = 'high_hype'
+        elif combined_hype >= thresholds[0]:  # >= 0.3
+            hype_level = 'medium_hype'
+        else:
+            hype_level = 'low_hype'
+        
+        return {
+            'hype_level': hype_level,
+            'volume_multiplier': multipliers[hype_level],
+            'combined_hype_score': combined_hype
+        }
+    
+    def _calculate_volatility_patterns(self, sentiment_score: float, hype_score: float) -> Dict[str, Any]:
+        """Calculate expected volatility patterns"""
+        abs_sentiment = abs(sentiment_score)
+        baseline_vol = self.strength_correlation['volatility_patterns']['baseline_volatility']
+        
+        # Determine volatility level
+        if abs_sentiment >= 0.8 or hype_score >= 0.8:
+            vol_level = 'extreme'
+        elif abs_sentiment >= 0.6 or hype_score >= 0.6:
+            vol_level = 'strong'
+        elif abs_sentiment >= 0.3 or hype_score >= 0.4:
+            vol_level = 'moderate'
+        else:
+            vol_level = 'weak'
+        
+        multiplier = self.strength_correlation['volatility_patterns']['hype_multipliers'][vol_level]
+        expected_volatility = baseline_vol * multiplier
+        
+        # Determine momentum persistence
+        if vol_level in ['extreme', 'strong']:
+            persistence = 'long'
+        elif vol_level == 'moderate':
+            persistence = 'medium'
+        else:
+            persistence = 'short'
+        
+        persistence_hours = self.strength_correlation['volatility_patterns']['momentum_persistence'][persistence]
+        
+        return {
+            'volatility_level': vol_level,
+            'expected_volatility': expected_volatility,
+            'volatility_multiplier': multiplier,
+            'persistence': persistence,
+            'persistence_hours': persistence_hours
+        }
+    
+    def _calculate_symbol_adjustments(self, symbols: List[str], sentiment_score: float) -> Dict[str, Any]:
+        """Calculate symbol-specific adjustments based on sector momentum"""
+        if not symbols:
+            return {}
+        
+        adjustments = {}
+        for symbol in symbols:
+            sector_info = self._get_symbol_sector(symbol)
+            if sector_info:
+                sector_config = self.market_context['sector_momentum'][sector_info['sector']]
+                
+                # Calculate adjusted impact
+                base_multiplier = sector_config['hype_multiplier']
+                volatility_factor = sector_config['volatility_factor']
+                
+                # Stronger sentiment gets more sector-specific amplification
+                adjusted_multiplier = base_multiplier * (1 + abs(sentiment_score) * 0.3)
+                
+                adjustments[symbol] = {
+                    'sector': sector_info['sector'],
+                    'base_multiplier': base_multiplier,
+                    'adjusted_multiplier': adjusted_multiplier,
+                    'volatility_factor': volatility_factor
+                }
+        
+        return adjustments
+    
+    def _get_symbol_sector(self, symbol: str) -> Optional[Dict[str, str]]:
+        """Get sector information for a symbol"""
+        for sector, config in self.market_context['sector_momentum'].items():
+            if symbol in config['symbols']:
+                return {'sector': sector}
+        return None
+    
+    def _calculate_overall_strength_score(self, velocity_info: Dict, volume_info: Dict, volatility_info: Dict) -> float:
+        """Calculate overall strength correlation score"""
+        velocity_score = velocity_info['expected_velocity'] / 3.0  # Normalize to 0-1
+        volume_score = min(volume_info['volume_multiplier'] / 10.0, 1.0)  # Normalize to 0-1
+        volatility_score = min(volatility_info['volatility_multiplier'] / 4.0, 1.0)  # Normalize to 0-1
+        
+        # Weighted combination
+        overall_score = (velocity_score * 0.4 + volume_score * 0.3 + volatility_score * 0.3)
+        
+        return min(overall_score, 1.0)
+
+    def calculate_market_context(self, item: Dict[str, Any], symbols: List[str] = None) -> Dict[str, Any]:
+        """Calculate market context including sector momentum, market regime, and time-of-day impact"""
+        
+        # 1. Sector momentum analysis
+        sector_analysis = self._analyze_sector_momentum(item, symbols)
+        
+        # 2. Market regime detection (simplified - would need more data for full implementation)
+        market_regime = self._detect_market_regime(item)
+        
+        # 3. Time-of-day impact
+        time_impact = self._calculate_time_of_day_impact(item)
+        
+        # 4. Combined market context score
+        context_score = self._calculate_context_score(sector_analysis, market_regime, time_impact)
+        
+        return {
+            'sector_analysis': sector_analysis,
+            'market_regime': market_regime,
+            'time_impact': time_impact,
+            'context_score': context_score,
+            'context_multiplier': self._get_context_multiplier(context_score)
+        }
+    
+    def _analyze_sector_momentum(self, item: Dict[str, Any], symbols: List[str]) -> Dict[str, Any]:
+        """Analyze sector-specific momentum and impact"""
+        content = f"{item.get('title', '')} {item.get('content', '')}".lower()
+        
+        detected_sectors = []
+        sector_scores = {}
+        
+        # Check content for sector keywords
+        for sector, config in self.market_context['sector_momentum'].items():
+            keyword_matches = sum(1 for keyword in config['keywords'] if keyword in content)
+            symbol_matches = sum(1 for symbol in config['symbols'] if symbols and symbol in symbols)
+            
+            if keyword_matches > 0 or symbol_matches > 0:
+                detected_sectors.append(sector)
+                sector_scores[sector] = {
+                    'keyword_matches': keyword_matches,
+                    'symbol_matches': symbol_matches,
+                    'hype_multiplier': config['hype_multiplier'],
+                    'volatility_factor': config['volatility_factor']
+                }
+        
+        return {
+            'detected_sectors': detected_sectors,
+            'sector_scores': sector_scores,
+            'dominant_sector': max(sector_scores.keys(), key=lambda s: sector_scores[s]['keyword_matches'] + sector_scores[s]['symbol_matches']) if sector_scores else None
+        }
+    
+    def _detect_market_regime(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        """Detect market regime (simplified implementation)"""
+        content = f"{item.get('title', '')} {item.get('content', '')}".lower()
+        
+        # Bull market indicators
+        bull_indicators = ['rally', 'surge', 'bull market', 'all-time high', 'record high', 'strong growth']
+        bull_score = sum(1 for indicator in bull_indicators if indicator in content)
+        
+        # Bear market indicators  
+        bear_indicators = ['crash', 'plunge', 'bear market', 'recession', 'downturn', 'selloff']
+        bear_score = sum(1 for indicator in bear_indicators if indicator in content)
+        
+        # Determine regime (simplified)
+        if bull_score > bear_score and bull_score > 0:
+            regime = 'bull_market'
+        elif bear_score > bull_score and bear_score > 0:
+            regime = 'bear_market'
+        else:
+            regime = 'neutral_market'
+        
+        regime_config = self.market_context['market_regime'][regime]
+        
+        return {
+            'regime': regime,
+            'bull_indicators': bull_score,
+            'bear_indicators': bear_score,
+            'positive_hype_multiplier': regime_config['positive_hype_multiplier'],
+            'negative_hype_multiplier': regime_config['negative_hype_multiplier'],
+            'risk_appetite': regime_config['risk_appetite']
+        }
+    
+    def _calculate_time_of_day_impact(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        """Calculate time-of-day impact multiplier"""
+        published_obj = item.get('published') or item.get('timestamp', '')
+        
+        if not published_obj:
+            return {'time_period': 'unknown', 'multiplier': 1.0}
+        
+        try:
+            if isinstance(published_obj, datetime):
+                hour = published_obj.hour
+            elif isinstance(published_obj, str):
+                if 'T' in published_obj:
+                    dt = datetime.fromisoformat(published_obj.replace('Z', '+00:00'))
+                    hour = dt.hour
+                else:
+                    dt = datetime.fromisoformat(published_obj)
+                    hour = dt.hour
+            else:
+                return {'time_period': 'unknown', 'multiplier': 1.0}
+            
+            # Find matching time period
+            for period, config in self.market_context['time_of_day_impact'].items():
+                if config['hours'][0] <= hour < config['hours'][1]:
+                    return {
+                        'time_period': period,
+                        'hour': hour,
+                        'multiplier': config['multiplier']
+                    }
+            
+            # Default to neutral if no match
+            return {'time_period': 'neutral', 'hour': hour, 'multiplier': 1.0}
+            
+        except Exception as e:
+            self.logger.warning(f"Error calculating time impact: {e}")
+            return {'time_period': 'unknown', 'multiplier': 1.0}
+    
+    def _calculate_context_score(self, sector_analysis: Dict, market_regime: Dict, time_impact: Dict) -> float:
+        """Calculate combined market context score"""
+        # Sector score (0-1)
+        sector_score = 0.0
+        if sector_analysis['dominant_sector']:
+            dominant_config = self.market_context['sector_momentum'][sector_analysis['dominant_sector']]
+            sector_score = min(dominant_config['hype_multiplier'], 1.0)
+        
+        # Market regime score (0-1)
+        regime_score = (market_regime['positive_hype_multiplier'] + market_regime['negative_hype_multiplier']) / 2
+        regime_score = min(regime_score, 1.0)
+        
+        # Time impact score (0-1)
+        time_score = min(time_impact['multiplier'], 1.0)
+        
+        # Weighted combination
+        context_score = (sector_score * 0.4 + regime_score * 0.3 + time_score * 0.3)
+        
+        return context_score
+    
+    def _get_context_multiplier(self, context_score: float) -> float:
+        """Convert context score to multiplier for impact scoring"""
+        # Scale context score to useful multiplier range (0.7 to 1.5)
+        return 0.7 + (context_score * 0.8)
+
     def get_impact_summary(self, news_items: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Get summary of news impact distribution"""
         if not news_items:
