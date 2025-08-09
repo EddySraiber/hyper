@@ -58,6 +58,12 @@ class TradingMetrics:
     enhanced_signals_used: int = 0
     ai_analysis_success_rate: float = 0.0
     
+    # Correlation Analysis
+    correlation_accuracy: float = 0.0
+    correlation_coefficient: float = 0.0
+    correlation_total_tests: int = 0
+    correlation_recent_tests: int = 0
+    
     # Time-based metrics
     timestamp: datetime = field(default_factory=datetime.utcnow)
     
@@ -131,6 +137,12 @@ class TradingMetrics:
             'features_trailing_stops_triggered': self.trailing_stops_triggered,
             'features_enhanced_signals_used': self.enhanced_signals_used,
             'features_ai_analysis_success_rate_percent': self.ai_analysis_success_rate * 100,
+            
+            # Correlation Analysis
+            'correlation_accuracy_percent': self.correlation_accuracy,
+            'correlation_coefficient': self.correlation_coefficient,
+            'correlation_total_tests': self.correlation_total_tests,
+            'correlation_recent_tests': self.correlation_recent_tests,
         }
 
 
@@ -219,6 +231,9 @@ class MetricsCollector(ComponentBase):
             # Collect system health metrics
             self._collect_system_metrics()
             
+            # Collect correlation metrics (if available)
+            self._collect_correlation_metrics()
+            
             # Update timestamp
             self.current_metrics.timestamp = datetime.utcnow()
             
@@ -301,6 +316,30 @@ class MetricsCollector(ComponentBase):
         # Error rate (simple implementation)
         total_operations = max(self.current_metrics.news_processed + self.current_metrics.total_trades, 1)
         self.current_metrics.error_rate = self.collection_errors / total_operations
+    
+    def _collect_correlation_metrics(self):
+        """Collect correlation analysis metrics"""
+        try:
+            # This will be updated by the main agent with correlation tracker data
+            # For now, set default values
+            if not hasattr(self, '_correlation_initialized'):
+                self.current_metrics.correlation_accuracy = 0.0
+                self.current_metrics.correlation_coefficient = 0.0
+                self.current_metrics.correlation_total_tests = 0
+                self.current_metrics.correlation_recent_tests = 0
+                self._correlation_initialized = True
+        except Exception as e:
+            logger.error(f"Error collecting correlation metrics: {e}")
+            
+    def update_correlation_metrics(self, correlation_data: Dict[str, float]):
+        """Update correlation metrics from external correlation tracker"""
+        try:
+            self.current_metrics.correlation_accuracy = correlation_data.get('correlation_accuracy_percent', 0.0)
+            self.current_metrics.correlation_coefficient = correlation_data.get('correlation_pearson_coefficient', 0.0)
+            self.current_metrics.correlation_total_tests = int(correlation_data.get('correlation_total_tests', 0))
+            self.current_metrics.correlation_recent_tests = int(correlation_data.get('correlation_recent_tests', 0))
+        except Exception as e:
+            logger.error(f"Error updating correlation metrics: {e}")
     
     def _store_metrics_history(self):
         """Store current metrics in history"""

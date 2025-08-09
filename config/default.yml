@@ -332,6 +332,13 @@ observability:
     calculate_profit_factor: true    # Calculate gross profit/loss ratio
     track_win_rate: true             # Track percentage of winning trades
     track_avg_trade_duration: true   # Track average time in positions
+    
+  # Correlation Analysis
+  correlation_tracker:
+    data_dir: "/app/data"            # Directory to store correlation data
+    max_results: 1000                # Maximum correlation results to keep
+    historical_test_enabled: true    # Enable historical correlation testing
+    auto_track_trades: true          # Automatically track live trade correlations
 
 # Alpaca API Configuration
 alpaca:

@@ -86,8 +86,13 @@ class AlgotradingAgent:
         
         # Initialize metrics collector for prometheus export
         from algotrading_agent.observability.metrics_collector import MetricsCollector
+        from algotrading_agent.observability.correlation_tracker import CorrelationTracker
         metrics_config = self.config.get('observability.metrics_collector', {})
         self.metrics_collector = MetricsCollector(metrics_config)
+        
+        # Initialize correlation tracker
+        correlation_config = self.config.get('observability.correlation_tracker', {'data_dir': '/app/data'})
+        self.correlation_tracker = CorrelationTracker(correlation_config)
         
         # Initialize health server with dashboard
         self.health_server = HealthServer(port=8080, agent_ref=self)
@@ -536,6 +541,11 @@ class AlgotradingAgent:
             
             # Update active alerts list for dashboard
             self._active_alerts = self.alert_manager.get_active_alerts()
+            
+            # Update metrics collector with correlation data
+            if hasattr(self, 'correlation_tracker'):
+                correlation_metrics = self.correlation_tracker.get_prometheus_metrics()
+                self.metrics_collector.update_correlation_metrics(correlation_metrics)
             
             if triggered_alerts:
                 self.logger.info(f"Alert evaluation completed: {len(triggered_alerts)} alerts triggered")

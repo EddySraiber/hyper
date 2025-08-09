@@ -49,6 +49,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._serve_log_analytics()
         elif path == '/api/logs/recent':
             self._serve_recent_logs()
+        elif path == '/api/correlation/test':
+            self._serve_correlation_test()
+        elif path == '/api/correlation/results':
+            self._serve_correlation_results()
         else:
             self._send_404()
             
@@ -758,6 +762,70 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._send_json(recent_logs_data)
         except Exception as e:
             self._send_error(500, f"Error getting recent logs: {str(e)}")
+    
+    def _serve_correlation_test(self):
+        """Run historical correlation test"""
+        try:
+            if self.agent and hasattr(self.agent, 'correlation_tracker'):
+                # Run async test in thread
+                import asyncio
+                import threading
+                
+                result = {"status": "starting", "message": "Correlation test initiated"}
+                
+                def run_test():
+                    try:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        test_result = loop.run_until_complete(
+                            self.agent.correlation_tracker.run_historical_test()
+                        )
+                        loop.close()
+                        
+                        # Store result (in production, you'd use a proper job queue)
+                        if not hasattr(self.agent, '_correlation_test_results'):
+                            self.agent._correlation_test_results = []
+                        self.agent._correlation_test_results.append(test_result)
+                        
+                    except Exception as e:
+                        print(f"Correlation test error: {e}")
+                
+                # Start test in background
+                test_thread = threading.Thread(target=run_test)
+                test_thread.start()
+                
+                result["message"] = "Historical correlation test started - check /api/correlation/results"
+            else:
+                result = {"status": "error", "message": "Correlation tracker not available"}
+            
+            self._send_json(result)
+        except Exception as e:
+            self._send_error(500, f"Error running correlation test: {str(e)}")
+    
+    def _serve_correlation_results(self):
+        """Serve correlation test results and current metrics"""
+        try:
+            results_data = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "current_metrics": {},
+                "grafana_data": {},
+                "recent_tests": []
+            }
+            
+            if self.agent and hasattr(self.agent, 'correlation_tracker'):
+                # Current correlation metrics
+                results_data["current_metrics"] = self.agent.correlation_tracker.current_metrics.to_dict()
+                
+                # Grafana visualization data
+                results_data["grafana_data"] = self.agent.correlation_tracker.get_grafana_data()
+                
+                # Recent test results (if any)
+                if hasattr(self.agent, '_correlation_test_results'):
+                    results_data["recent_tests"] = self.agent._correlation_test_results[-5:]  # Last 5 tests
+            
+            self._send_json(results_data)
+        except Exception as e:
+            self._send_error(500, f"Error getting correlation results: {str(e)}")
             
     def _handle_config_update(self, path):
         try:
