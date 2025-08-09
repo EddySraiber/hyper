@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a containerized Python algorithmic trading system that analyzes financial news sentiment to make automated paper trading decisions via the Alpaca API. The system follows a modular pipeline architecture with 6 core components processing news through to trade execution.
 
-**SYSTEM STATUS: FULLY OPERATIONAL** - Successfully generating and executing trades through AI-enhanced sentiment analysis, comprehensive trading cost modeling, and robust testing framework with 80% news-to-price correlation accuracy.
+**SYSTEM STATUS: FULLY OPERATIONAL** - Successfully generating and executing trades through AI-enhanced sentiment analysis, comprehensive trading cost modeling, robust testing framework with 80% news-to-price correlation accuracy, and **real-time Alpaca data synchronization** for accurate dashboard metrics.
 
 ## Development Commands
 
@@ -230,6 +230,57 @@ See `QA_TESTING_GUIDE.md` for comprehensive testing procedures including:
 - Configuration changes and error scenario testing
 - **Trading execution validation** - verify trades appear in Alpaca account
 
+## Real Alpaca Data Synchronization
+
+**NEW FEATURE**: The system now includes comprehensive real-time synchronization with Alpaca trading data to provide accurate dashboard metrics and eliminate discrepancies between sample data and actual trading activity.
+
+### AlpacaSyncService Features
+- **Real-time data sync**: Syncs actual Alpaca account data, positions, and orders every processing cycle
+- **Accurate metrics**: Dashboard shows real portfolio value, active positions, and trade performance
+- **Historical integration**: Creates trade records from existing Alpaca order history
+- **P&L calculation**: Calculates win/loss ratios from actual filled orders
+- **Position tracking**: Monitors real unrealized P&L from active positions
+
+### Key Metrics Synchronized
+```bash
+# Real Alpaca data now reflected in Prometheus metrics:
+trading_active_trades_count 3        # Actual number of active positions
+portfolio_value_usd 100023.70        # Real account portfolio value
+trading_total_pnl                    # Combined realized + unrealized P&L
+trading_win_rate_percent             # Calculated from actual trade history
+```
+
+### Verification Commands
+```bash
+# Check real data sync status
+docker-compose logs algotrading-agent | grep "Synced real Alpaca data"
+
+# Verify Prometheus metrics show real data
+curl http://localhost:8080/metrics | grep trading_active_trades_count
+
+# Check current Alpaca positions
+docker-compose exec algotrading-agent python -c "
+import asyncio
+from algotrading_agent.trading.alpaca_client import AlpacaClient
+from algotrading_agent.config.settings import get_config
+async def check(): 
+    client = AlpacaClient(get_config().get_alpaca_config())
+    positions = await client.get_positions()
+    print(f'Real positions: {len(positions)}')
+    for pos in positions:
+        print(f'  {pos[\"symbol\"]}: {pos[\"quantity\"]} shares, P&L: \${pos[\"unrealized_pl\"]}')
+asyncio.run(check())
+"
+```
+
+### Implementation Details
+- **File**: `algotrading_agent/observability/alpaca_sync.py` - Core synchronization service
+- **Integration**: Automatically initializes when Alpaca client connects successfully
+- **Error handling**: Graceful degradation if Alpaca API is unavailable
+- **Data flow**: Real data → AlpacaSyncService → MetricsCollector → Prometheus → Grafana
+
+**IMPORTANT**: This resolves the previous issue where dashboard showed sample data (100% accuracy, 0 active trades) while real Alpaca trades existed. The system now accurately reflects your actual trading performance.
+
 ## Dependencies
 
 Key Python packages (see `requirements.txt`):
@@ -238,6 +289,7 @@ Key Python packages (see `requirements.txt`):
 - `feedparser==6.0.10` - RSS news feed parsing
 - `textblob==0.17.1` - Natural language processing
 - `pyyaml==6.0.1` - Configuration management
+- `psutil==5.9.5` - System resource monitoring for metrics
 
 ## Docker Architecture
 

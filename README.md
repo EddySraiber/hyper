@@ -82,7 +82,23 @@ decision_engine:
   default_take_profit_pct: 0.10   # 10% take profit
 ```
 
-## 📈 Monitoring
+## 📈 Monitoring & Dashboard
+
+**Real-time Dashboard:** [http://localhost:8080/dashboard](http://localhost:8080/dashboard)
+- Live trading performance metrics
+- Portfolio value and positions
+- News analysis and trading decisions
+- System health and component status
+
+**Advanced Visualization:**
+```bash
+# Start monitoring stack with Grafana + Prometheus
+docker-compose --profile monitoring up --build
+
+# Access Grafana dashboard
+# URL: http://localhost:3000 (admin/admin)
+# View comprehensive trading analytics with charts
+```
 
 **View real-time activity:**
 ```bash
@@ -91,13 +107,23 @@ docker-compose logs -f
 
 # Check system status
 curl http://localhost:8080/health
+
+# Real-time metrics (Prometheus format)
+curl http://localhost:8080/metrics
 ```
 
 **Key log messages to watch for:**
+- `✅ Synced real Alpaca data: X positions, $Y portfolio value`
 - `Scraped X news items`
 - `Generated X trading decisions` 
 - `Risk manager approved X trades`
 - `Executed trade: SYMBOL BUY/SELL`
+
+**NEW: Real Alpaca Data Sync**
+The system automatically syncs with your actual Alpaca paper trading account:
+- Shows real portfolio value and positions
+- Tracks actual P&L from executed trades
+- Eliminates discrepancies between dashboard and broker data
 
 ## 🛠️ Development Commands
 
