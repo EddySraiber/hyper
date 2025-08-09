@@ -430,7 +430,7 @@ class TradingDashboard:
         
         return {'type': current_result, 'count': streak_count}
     
-    def generate_html_dashboard(self) -> str:
+    def _legacy_generate_html_dashboard(self) -> str:
         """Generate HTML dashboard for web display"""
         
         data = self.get_dashboard_data()

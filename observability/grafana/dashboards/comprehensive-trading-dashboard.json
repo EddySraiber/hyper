@@ -1,0 +1,501 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "🚀 Comprehensive Trading Performance",
+    "tags": ["trading", "performance", "analytics"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "💰 Total P&L",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "trading_total_pnl",
+            "legendFormat": "Total P&L"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 0},
+                {"color": "green", "value": 100}
+              ]
+            },
+            "mappings": [],
+            "color": {
+              "mode": "thresholds"
+            }
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "center",
+          "orientation": "horizontal",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "textMode": "auto"
+        },
+        "gridPos": {"h": 6, "w": 4, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "📊 Win Rate",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "trading_win_rate_percent",
+            "legendFormat": "Win Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 40},
+                {"color": "green", "value": 60}
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "showThresholdLabels": false,
+          "showThresholdMarkers": true
+        },
+        "gridPos": {"h": 6, "w": 4, "x": 4, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "🎯 Trade Success Rate",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(trading_winning_trades[5m]) * 300",
+            "legendFormat": "Win Rate (5m)"
+          },
+          {
+            "expr": "rate(trading_total_trades[5m]) * 300",
+            "legendFormat": "Total Trades (5m)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "spanNulls": false,
+              "showPoints": "auto",
+              "pointSize": 5
+            },
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short"
+          }
+        },
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "📈 Daily P&L Trend",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "increase(trading_total_pnl[1d])",
+            "legendFormat": "Daily P&L"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "bars",
+              "barAlignment": 0,
+              "lineWidth": 1,
+              "fillOpacity": 80,
+              "gradientMode": "none"
+            },
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 0}
+              ]
+            },
+            "unit": "currencyUSD"
+          }
+        },
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 0}
+      },
+      {
+        "id": 5,
+        "title": "🔍 Recent Trades",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "trading_recent_trades",
+            "legendFormat": "",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "pnl"
+              },
+              "properties": [
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "steps": [
+                      {"color": "red", "value": null},
+                      {"color": "green", "value": 0}
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6}
+      },
+      {
+        "id": 6,
+        "title": "🚨 Failure Analysis",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "trading_failure_weak_sentiment",
+            "legendFormat": "Weak Sentiment"
+          },
+          {
+            "expr": "trading_failure_market_overreaction",
+            "legendFormat": "Market Overreaction"
+          },
+          {
+            "expr": "trading_failure_stop_loss",
+            "legendFormat": "Stop Loss Triggered"
+          },
+          {
+            "expr": "trading_failure_timing",
+            "legendFormat": "Poor Timing"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "pieType": "pie",
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          },
+          "legend": {
+            "displayMode": "visible",
+            "placement": "bottom"
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 6}
+      },
+      {
+        "id": 7,
+        "title": "📰 News Source Performance",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "source_win_rate_reuters",
+            "legendFormat": "Reuters"
+          },
+          {
+            "expr": "source_win_rate_bloomberg",
+            "legendFormat": "Bloomberg"  
+          },
+          {
+            "expr": "source_win_rate_marketwatch",
+            "legendFormat": "MarketWatch"
+          },
+          {
+            "expr": "source_win_rate_yahoo",
+            "legendFormat": "Yahoo Finance"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 50},
+                {"color": "green", "value": 70}
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 6}
+      },
+      {
+        "id": 8,
+        "title": "🧠 Decision Quality Trends",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "avg_over_time(decision_quality_score[1h])",
+            "legendFormat": "Decision Quality"
+          },
+          {
+            "expr": "avg_over_time(decision_confidence[1h])",
+            "legendFormat": "Average Confidence"
+          },
+          {
+            "expr": "decision_high_risk_percentage",
+            "legendFormat": "High Risk %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "gradientMode": "opacity"
+            },
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1
+          }
+        },
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 14}
+      },
+      {
+        "id": 9,
+        "title": "⚡ Active Trades Monitor",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "trading_active_trades_count",
+            "legendFormat": "Active Trades"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 10}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "center"
+        },
+        "gridPos": {"h": 3, "w": 4, "x": 12, "y": 14}
+      },
+      {
+        "id": 10,
+        "title": "🎭 Trading Emotions",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "trading_fear_greed_index",
+            "legendFormat": "Market Sentiment"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 25},
+                {"color": "green", "value": 40},
+                {"color": "yellow", "value": 75},
+                {"color": "red", "value": 90}
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "gridPos": {"h": 6, "w": 4, "x": 16, "y": 14}
+      },
+      {
+        "id": 11,
+        "title": "🏆 Top Performing Symbols",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, sum by (symbol) (trading_symbol_pnl))",
+            "legendFormat": "",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Value"
+              },
+              "properties": [
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                },
+                {
+                  "id": "unit",
+                  "value": "currencyUSD"
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 20}
+      },
+      {
+        "id": 12,
+        "title": "📊 Correlation Analysis",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "correlation_accuracy_percent",
+            "legendFormat": "News-Price Accuracy"
+          },
+          {
+            "expr": "correlation_coefficient * 100",
+            "legendFormat": "Correlation Strength"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 30
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 20}
+      },
+      {
+        "id": 13,
+        "title": "🎯 Success Factors",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "trading_success_strong_news",
+            "legendFormat": "Strong News Signal"
+          },
+          {
+            "expr": "trading_success_high_confidence",
+            "legendFormat": "High Confidence"
+          },
+          {
+            "expr": "trading_success_breaking_news",
+            "legendFormat": "Breaking News"
+          },
+          {
+            "expr": "trading_success_quick_execution",
+            "legendFormat": "Quick Execution"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 5},
+                {"color": "green", "value": 10}
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient"
+        },
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 20}
+      }
+    ],
+    "time": {"from": "now-6h", "to": "now"},
+    "refresh": "30s"
+  }
+}

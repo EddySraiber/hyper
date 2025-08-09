@@ -64,6 +64,26 @@ class TradingMetrics:
     correlation_total_tests: int = 0
     correlation_recent_tests: int = 0
     
+    # Trading Performance Analytics
+    trading_active_trades: int = 0
+    trading_total_pnl: float = 0.0
+    trading_daily_pnl: float = 0.0
+    trading_win_rate: float = 0.0
+    trading_best_trade: float = 0.0
+    trading_worst_trade: float = 0.0
+    trading_avg_trade_duration: float = 0.0
+    
+    # Failure Analysis  
+    failure_weak_sentiment: int = 0
+    failure_market_overreaction: int = 0
+    failure_stop_loss_triggered: int = 0
+    failure_timing_issues: int = 0
+    
+    # Decision Quality
+    decision_avg_quality: float = 0.0
+    decision_avg_confidence: float = 0.0
+    decision_high_risk_percentage: float = 0.0
+    
     # Time-based metrics
     timestamp: datetime = field(default_factory=datetime.utcnow)
     
@@ -143,6 +163,26 @@ class TradingMetrics:
             'correlation_coefficient': self.correlation_coefficient,
             'correlation_total_tests': self.correlation_total_tests,
             'correlation_recent_tests': self.correlation_recent_tests,
+            
+            # Trading Performance Analytics
+            'trading_active_trades_count': self.trading_active_trades,
+            'trading_total_pnl': self.trading_total_pnl,
+            'trading_daily_pnl': self.trading_daily_pnl,
+            'trading_win_rate_percent': self.trading_win_rate,
+            'trading_best_trade': self.trading_best_trade,
+            'trading_worst_trade': self.trading_worst_trade,
+            'trading_avg_duration_minutes': self.trading_avg_trade_duration,
+            
+            # Failure Analysis
+            'trading_failure_weak_sentiment': self.failure_weak_sentiment,
+            'trading_failure_market_overreaction': self.failure_market_overreaction,
+            'trading_failure_stop_loss': self.failure_stop_loss_triggered,
+            'trading_failure_timing': self.failure_timing_issues,
+            
+            # Decision Quality
+            'decision_quality_avg': self.decision_avg_quality,
+            'decision_confidence_avg': self.decision_avg_confidence,
+            'decision_high_risk_percent': self.decision_high_risk_percentage,
         }
 
 
