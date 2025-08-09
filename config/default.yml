@@ -339,6 +339,28 @@ observability:
     max_results: 1000                # Maximum correlation results to keep
     historical_test_enabled: true    # Enable historical correlation testing
     auto_track_trades: true          # Automatically track live trade correlations
+    
+  # Trade Performance Tracking
+  trade_performance_tracker:
+    data_dir: "/app/data"            # Directory to store trade outcome data
+    max_trades: 1000                 # Maximum trade records to keep
+    enable_detailed_analysis: true   # Enable detailed success/failure analysis
+    track_news_attribution: true     # Track which news led to which outcomes
+    
+  # Decision Analysis
+  decision_analyzer:
+    data_dir: "/app/data"            # Directory to store decision analysis data
+    short_analysis_window: 24        # Hours for short-term analysis
+    medium_analysis_window: 168      # Hours for medium-term analysis (1 week)
+    long_analysis_window: 720        # Hours for long-term analysis (1 month)
+    enable_pattern_detection: true   # Enable decision pattern detection
+    
+  # Trading Dashboard
+  trading_dashboard:
+    refresh_interval: 30             # Dashboard refresh interval in seconds
+    max_recent_trades: 20            # Maximum recent trades to display
+    max_insights: 10                 # Maximum insights/recommendations to show
+    enable_html_export: true         # Enable HTML dashboard export
 
 # Alpaca API Configuration
 alpaca:

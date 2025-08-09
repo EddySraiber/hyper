@@ -84,15 +84,37 @@ class AlgotradingAgent:
         log_agg_config = self.config.get('observability.log_aggregator', {})
         self.log_aggregator = LogAggregator(log_agg_config)
         
-        # Initialize metrics collector for prometheus export
+        # Initialize observability components
         from algotrading_agent.observability.metrics_collector import MetricsCollector
         from algotrading_agent.observability.correlation_tracker import CorrelationTracker
+        from algotrading_agent.observability.trade_performance_tracker import TradePerformanceTracker
+        from algotrading_agent.observability.decision_analyzer import DecisionAnalyzer
+        from algotrading_agent.observability.trading_dashboard import TradingDashboard
+        
+        # Initialize metrics collector
         metrics_config = self.config.get('observability.metrics_collector', {})
         self.metrics_collector = MetricsCollector(metrics_config)
         
         # Initialize correlation tracker
         correlation_config = self.config.get('observability.correlation_tracker', {'data_dir': '/app/data'})
         self.correlation_tracker = CorrelationTracker(correlation_config)
+        
+        # Initialize trade performance tracker
+        trade_tracker_config = self.config.get('observability.trade_performance_tracker', {'data_dir': '/app/data'})
+        self.trade_performance_tracker = TradePerformanceTracker(trade_tracker_config)
+        
+        # Initialize decision analyzer
+        decision_analyzer_config = self.config.get('observability.decision_analyzer', {'data_dir': '/app/data'})
+        self.decision_analyzer = DecisionAnalyzer(decision_analyzer_config)
+        
+        # Initialize comprehensive trading dashboard
+        dashboard_config = self.config.get('observability.trading_dashboard', {})
+        self.trading_dashboard = TradingDashboard(
+            trade_tracker=self.trade_performance_tracker,
+            decision_analyzer=self.decision_analyzer,
+            correlation_tracker=self.correlation_tracker,
+            config=dashboard_config
+        )
         
         # Initialize health server with dashboard
         self.health_server = HealthServer(port=8080, agent_ref=self)
@@ -546,6 +568,15 @@ class AlgotradingAgent:
             if hasattr(self, 'correlation_tracker'):
                 correlation_metrics = self.correlation_tracker.get_prometheus_metrics()
                 self.metrics_collector.update_correlation_metrics(correlation_metrics)
+            
+            # Generate session insights from decision analyzer
+            if hasattr(self, 'decision_analyzer'):
+                session_insights = self.decision_analyzer.generate_session_insights()
+                if session_insights:
+                    self.logger.info(f"Generated {len(session_insights)} decision insights")
+                    for insight in session_insights:
+                        if insight.priority >= 4:
+                            self.logger.warning(f"High priority insight: {insight.title} - {insight.recommendation}")
             
             if triggered_alerts:
                 self.logger.info(f"Alert evaluation completed: {len(triggered_alerts)} alerts triggered")

@@ -53,6 +53,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._serve_correlation_test()
         elif path == '/api/correlation/results':
             self._serve_correlation_results()
+        elif path == '/api/trading/dashboard':
+            self._serve_trading_dashboard()
+        elif path == '/api/trading/performance':
+            self._serve_trading_performance()
+        elif path == '/api/trading/decisions':
+            self._serve_trading_decisions()
         else:
             self._send_404()
             
@@ -826,6 +832,63 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._send_json(results_data)
         except Exception as e:
             self._send_error(500, f"Error getting correlation results: {str(e)}")
+    
+    def _serve_trading_dashboard(self):
+        """Serve comprehensive trading dashboard data"""
+        try:
+            if self.agent and hasattr(self.agent, 'trading_dashboard'):
+                dashboard_data = self.agent.trading_dashboard.get_dashboard_data()
+                self._send_json(dashboard_data)
+            else:
+                self._send_json({
+                    "error": "Trading dashboard not available",
+                    "message": "Dashboard components not initialized"
+                })
+        except Exception as e:
+            self._send_error(500, f"Error getting trading dashboard: {str(e)}")
+    
+    def _serve_trading_performance(self):
+        """Serve trading performance summary"""
+        try:
+            if self.agent and hasattr(self.agent, 'trade_performance_tracker'):
+                performance_data = self.agent.trade_performance_tracker.get_performance_summary()
+                recent_trades = self.agent.trade_performance_tracker.get_recent_trades(24)
+                
+                response_data = {
+                    "performance_summary": performance_data,
+                    "recent_trades": recent_trades,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                
+                self._send_json(response_data)
+            else:
+                self._send_json({
+                    "error": "Trade performance tracker not available",
+                    "performance_summary": {},
+                    "recent_trades": []
+                })
+        except Exception as e:
+            self._send_error(500, f"Error getting trading performance: {str(e)}")
+    
+    def _serve_trading_decisions(self):
+        """Serve trading decision analytics"""
+        try:
+            if self.agent and hasattr(self.agent, 'decision_analyzer'):
+                decision_data = self.agent.decision_analyzer.get_decision_analytics()
+                
+                response_data = {
+                    "decision_analytics": decision_data,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                
+                self._send_json(response_data)
+            else:
+                self._send_json({
+                    "error": "Decision analyzer not available",
+                    "decision_analytics": {}
+                })
+        except Exception as e:
+            self._send_error(500, f"Error getting trading decisions: {str(e)}")
             
     def _handle_config_update(self, path):
         try:
