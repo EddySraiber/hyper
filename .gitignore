@@ -31,3 +31,121 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Python
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Trading System Specific
+# Memory and state files (contain trading positions and history)
+**/memory.json
+**/session-history.json
+**/correlation_results.json
+**/trade_outcomes.json
+**/*_memory.json
+
+# Database files (logs, trades, etc.)
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache directories
+cache/
+.cache/
+__pycache__/
+
+# Monitoring and metrics data
+prometheus_data/
+grafana_data/
+
+# Keep Grafana dashboard configs (these should be committed)
+!observability/grafana/dashboards/*.json
+!observability/grafana/provisioning/**/*.yml
+
+# Docker volumes (should not be committed)
+volumes/
+
+# API keys and secrets (critical for security)
+secrets/
+keys/
+*.pem
+*.key
+*.crt
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# IDE specific
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# MacOS
+.AppleDouble
+.LSOverride
+
+# Windows
+desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# Network files
+.nfs*
+
+# AI/ML model files (if any models are downloaded/cached)
+*.model
+*.pkl
+*.pickle
+models/
+checkpoints/
+
+# Jupyter notebook outputs
+*.ipynb
+
+# Testing artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+*.cover
+.hypothesis/
+
+# Documentation builds
+docs/_build/
+site/
