@@ -23,6 +23,7 @@ from algotrading_agent.trading.alpaca_client import AlpacaClient
 from algotrading_agent.api.health import HealthServer
 from algotrading_agent.observability.alert_manager import AlertManager
 from algotrading_agent.observability.log_aggregator import LogAggregator, StructuredLogHandler
+from algotrading_agent.observability.alpaca_sync import AlpacaSyncService
 
 
 class DashboardLogHandler(logging.Handler):
@@ -116,6 +117,9 @@ class AlgotradingAgent:
             config=dashboard_config
         )
         
+        # Initialize Alpaca sync service for real data
+        self.alpaca_sync = None  # Will be initialized after alpaca_client is ready
+        
         # Initialize health server with dashboard
         self.health_server = HealthServer(port=8080, agent_ref=self)
         
@@ -202,10 +206,32 @@ class AlgotradingAgent:
                 try:
                     account_info = await self.alpaca_client.get_account_info()
                     self.logger.info(f"Connected to Alpaca - Portfolio Value: ${account_info['portfolio_value']:,.2f}")
+                    
+                    # Initialize Alpaca sync service for real data
+                    self.alpaca_sync = AlpacaSyncService(
+                        alpaca_client=self.alpaca_client,
+                        trade_tracker=self.trade_performance_tracker,
+                        metrics_collector=self.metrics_collector
+                    )
+                    
+                    # Do initial sync of real Alpaca data
+                    sync_result = await self.alpaca_sync.sync_real_trading_data()
+                    if sync_result['success']:
+                        self.logger.info(f"✅ Synced real Alpaca data: {sync_result['positions']} positions, "
+                                        f"${sync_result['portfolio_value']:,.2f} portfolio value")
+                        
+                        # Create trade records from historical Alpaca data  
+                        created_trades = await self.alpaca_sync.create_trade_records_from_alpaca()
+                        if created_trades > 0:
+                            self.logger.info(f"Created {created_trades} trade records from Alpaca history")
+                    else:
+                        self.logger.warning(f"Failed to sync Alpaca data: {sync_result.get('error', 'Unknown error')}")
+                        
                 except Exception as e:
                     self.logger.warning(f"Alpaca connection failed: {e}")
                     self.logger.info("Continuing in SIMULATION MODE - no real trading")
                     self.alpaca_client = None  # Fall back to simulation
+                    self.alpaca_sync = None
                 
             self.logger.info("All components started successfully")
             
@@ -363,7 +389,16 @@ class AlgotradingAgent:
                 # Step 8: Process trade failure feedback (always check, even in rest mode)
                 await self._process_failure_feedback()
                 
-                # Step 9: Evaluate alerts
+                # Step 9: Sync real Alpaca data with observability metrics
+                if self.alpaca_sync:
+                    try:
+                        sync_result = await self.alpaca_sync.sync_real_trading_data()
+                        if not sync_result['success']:
+                            self.logger.warning(f"Alpaca data sync failed: {sync_result.get('error', 'Unknown')}")
+                    except Exception as e:
+                        self.logger.error(f"Error syncing Alpaca data: {e}")
+                
+                # Step 10: Evaluate alerts
                 await self._evaluate_alerts()
                     
                 # Log processing time
