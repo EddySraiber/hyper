@@ -21,6 +21,8 @@ from algotrading_agent.components.statistical_advisor import StatisticalAdvisor
 from algotrading_agent.components.trade_manager import TradeManager
 from algotrading_agent.trading.alpaca_client import AlpacaClient
 from algotrading_agent.api.health import HealthServer
+from algotrading_agent.observability.service import ObservabilityService, ObservabilityConfig
+from algotrading_agent.observability.schemas.live_metrics import ComponentStatus
 from algotrading_agent.observability.alert_manager import AlertManager
 from algotrading_agent.observability.log_aggregator import LogAggregator, StructuredLogHandler
 from algotrading_agent.observability.alpaca_sync import AlpacaSyncService
@@ -120,6 +122,14 @@ class AlgotradingAgent:
         # Initialize Alpaca sync service for real data
         self.alpaca_sync = None  # Will be initialized after alpaca_client is ready
         
+        # Initialize observability service (enterprise-grade)
+        obs_config = ObservabilityConfig(
+            prometheus_port=8090,
+            enable_live_metrics=True,
+            enable_backtest_metrics=True
+        )
+        self.observability = ObservabilityService(obs_config)
+        
         # Initialize health server with dashboard
         self.health_server = HealthServer(port=8080, agent_ref=self)
         
@@ -179,7 +189,10 @@ class AlgotradingAgent:
         self.running = True
         
         try:
-            # Start health server first
+            # Start observability service first
+            await self.observability.start()
+            
+            # Start health server
             self.health_server.start()
             
             # Start log aggregator and add structured logging

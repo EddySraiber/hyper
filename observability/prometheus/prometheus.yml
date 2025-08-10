@@ -1,0 +1,58 @@
+# Prometheus Configuration for Algorithmic Trading System
+# Clean architecture with proper service discovery
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'algotrading-monitor'
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Load rules once and periodically evaluate them
+rule_files: []
+
+# Scrape configuration
+scrape_configs:
+  # Live Trading Metrics - Main Application
+  - job_name: 'algotrading-live'
+    scrape_interval: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['algotrading_agent:8090']
+    scrape_timeout: 9s
+    honor_labels: true
+    params:
+      format: ['prometheus']
+    
+  # Backtest Metrics - Push Gateway
+  - job_name: 'algotrading-backtest'
+    scrape_interval: 30s
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']
+    metrics_path: /metrics
+    
+  # Application Health Metrics
+  - job_name: 'algotrading-health'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['algotrading_agent:8080']
+    metrics_path: /health/metrics
+    scrape_timeout: 10s
+    
+  # System Metrics (Optional)
+  - job_name: 'node'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # Prometheus Self-Monitoring
+  - job_name: 'prometheus'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['localhost:9090']

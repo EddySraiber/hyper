@@ -30,7 +30,8 @@ services:
     
     # Ports (for monitoring/health checks)
     ports:
-      - "8080:8080"
+      - "8080:8080"  # Health/dashboard server
+      - "8090:8090"  # Prometheus metrics server
     
     # Health check
     healthcheck:

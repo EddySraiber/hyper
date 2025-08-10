@@ -1,0 +1,44 @@
+apiVersion: 1
+
+# Clean datasource configuration
+datasources:
+  # Primary Prometheus - Live Trading Data
+  - name: Prometheus Live
+    type: prometheus
+    uid: prometheus-live
+    url: http://prometheus:9090
+    access: proxy
+    isDefault: true
+    
+    jsonData:
+      httpMethod: GET
+      timeInterval: 10s
+      exemplarTraceIdDestinations:
+        - name: traceID
+          datasourceUid: jaeger
+          
+    # Performance optimizations
+    maxConcurrentQueries: 20
+    
+    # Caching
+    cache:
+      enabled: true
+      ttlMs: 30000
+      
+    orgId: 1
+    version: 1
+    
+  # Pushgateway - Backtest Data  
+  - name: Prometheus Backtest
+    type: prometheus
+    uid: prometheus-backtest
+    url: http://pushgateway:9091
+    access: proxy
+    isDefault: false
+    
+    jsonData:
+      httpMethod: GET
+      timeInterval: 30s
+      
+    orgId: 1
+    version: 1
