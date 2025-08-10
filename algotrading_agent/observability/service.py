@@ -12,7 +12,11 @@ from datetime import datetime
 from dataclasses import dataclass
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, start_http_server
-from prometheus_client.gateway import push_to_gateway
+try:
+    from prometheus_client.gateway import push_to_gateway
+except ImportError:
+    # Fallback for older prometheus_client versions
+    push_to_gateway = None
 
 from .schemas.live_metrics import (
     LIVE_METRICS, LiveMetricValue, ComponentStatus, 
@@ -245,6 +249,19 @@ class ObservabilityService:
         except Exception as e:
             self.logger.error(f"Error setting portfolio value: {e}")
     
+    def set_active_positions(self, count: int):
+        """Set active positions count"""
+        
+        if "trading_active_positions" not in self._live_metrics:
+            return
+            
+        try:
+            metric = self._live_metrics["trading_active_positions"]
+            metric.set(count)
+            
+        except Exception as e:
+            self.logger.error(f"Error setting active positions: {e}")
+    
     # Backtest Metrics Interface
     
     async def process_backtest_results(self, results: Dict[str, Any], run_id: str = None):
@@ -296,6 +313,32 @@ class ObservabilityService:
             
         except Exception as e:
             self.logger.error(f"Error pushing backtest metrics: {e}")
+    
+    # Current Metrics Interface
+    
+    async def get_current_metrics(self) -> Dict[str, Any]:
+        """Get current live metrics snapshot"""
+        try:
+            current_metrics = {}
+            
+            # Collect current values from all live metrics
+            for metric_name, metric in self._live_metrics.items():
+                try:
+                    # Get metric samples to extract current values
+                    if hasattr(metric, '_value'):
+                        current_metrics[metric_name] = metric._value._value
+                    elif hasattr(metric, '_total'):
+                        current_metrics[metric_name] = metric._total._value
+                    else:
+                        current_metrics[metric_name] = 0.0
+                except AttributeError:
+                    current_metrics[metric_name] = 0.0
+            
+            return current_metrics
+            
+        except Exception as e:
+            self.logger.error(f"Error getting current metrics: {e}")
+            return {}
     
     # Health and Status
     

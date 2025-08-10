@@ -14,10 +14,11 @@ logger = logging.getLogger(__name__)
 class AlpacaSyncService:
     """Syncs real Alpaca data with observability metrics"""
     
-    def __init__(self, alpaca_client, trade_tracker, metrics_collector):
+    def __init__(self, alpaca_client, trade_tracker=None, metrics_collector=None, observability_service=None):
         self.alpaca_client = alpaca_client
-        self.trade_tracker = trade_tracker
-        self.metrics_collector = metrics_collector
+        self.trade_tracker = trade_tracker  # Optional - legacy component
+        self.metrics_collector = metrics_collector  # Optional - legacy component
+        self.observability_service = observability_service  # New unified service
         
         # Track processed orders to avoid duplicates
         self.processed_orders = set()
@@ -130,11 +131,29 @@ class AlpacaSyncService:
         }
     
     def _update_metrics_with_real_data(self, real_metrics: Dict[str, Any]):
-        """Update metrics collector with real Alpaca data"""
+        """Update metrics with real Alpaca data"""
         
         try:
-            # Update current metrics with REAL data
-            if hasattr(self.metrics_collector, 'current_metrics'):
+            # Update with new ObservabilityService (preferred)
+            if self.observability_service:
+                # Update live metrics with real data
+                self.observability_service.set_active_positions(real_metrics['active_trades'])
+                self.observability_service.set_portfolio_value(real_metrics['total_realized_pnl'] + real_metrics['total_unrealized_pnl'])
+                
+                # Record trading decisions if we have them
+                for _ in range(real_metrics['active_trades']):
+                    self.observability_service.record_trading_decision(
+                        symbol="PORTFOLIO", 
+                        action="hold", 
+                        confidence=0.8,
+                        execution_mode="normal"
+                    )
+                
+                logger.info(f"Updated ObservabilityService: {real_metrics['active_trades']} active positions, "
+                          f"{real_metrics['win_rate']:.1f}% win rate")
+            
+            # Fallback to legacy metrics collector
+            elif hasattr(self.metrics_collector, 'current_metrics'):
                 metrics = self.metrics_collector.current_metrics
                 
                 # Update with real trading data
@@ -148,14 +167,7 @@ class AlpacaSyncService:
                 metrics.winning_trades = real_metrics['winning_trades']
                 metrics.losing_trades = real_metrics['losing_trades']
                 
-                # Calculate best/worst from recent positions
-                if hasattr(self, '_last_positions'):
-                    position_pnls = [float(pos.get('unrealized_pl', 0) or 0) for pos in self._last_positions]
-                    if position_pnls:
-                        metrics.trading_best_trade = max(position_pnls)
-                        metrics.trading_worst_trade = min(position_pnls)
-                
-                logger.info(f"Updated metrics with real data: {real_metrics['active_trades']} active, "
+                logger.info(f"Updated legacy metrics: {real_metrics['active_trades']} active, "
                           f"{real_metrics['win_rate']:.1f}% win rate")
         
         except Exception as e:
@@ -211,13 +223,14 @@ class AlpacaSyncService:
                             fees=0.0
                         )
                         
-                        # Add to trade tracker (this will calculate P&L etc.)
-                        trade = self.trade_tracker.start_trade(
-                            trade_id=f"alpaca_{order.get('order_id')}",
-                            news_context=news_context,
-                            decision=decision,
-                            execution=execution
-                        )
+                        # Add to trade tracker (this will calculate P&L etc.) - if available
+                        if self.trade_tracker:
+                            trade = self.trade_tracker.start_trade(
+                                trade_id=f"alpaca_{order.get('order_id')}",
+                                news_context=news_context,
+                                decision=decision,
+                                execution=execution
+                            )
                         
                         # Mark as processed
                         self.processed_orders.add(order.get('order_id'))

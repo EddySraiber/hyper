@@ -29,8 +29,8 @@ services:
     networks:
       - algotrading_network
       
-    depends_on:
-      - algotrading-agent
+    # depends_on:
+    #   - algotrading-agent  # Runs in main compose
       
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
@@ -110,3 +110,4 @@ volumes:
 networks:
   algotrading_network:
     external: true
+    name: hyper_algotrading_network

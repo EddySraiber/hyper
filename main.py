@@ -87,37 +87,19 @@ class AlgotradingAgent:
         log_agg_config = self.config.get('observability.log_aggregator', {})
         self.log_aggregator = LogAggregator(log_agg_config)
         
-        # Initialize observability components
-        from algotrading_agent.observability.metrics_collector import MetricsCollector
+        # Initialize observability components (legacy - some still needed)
         from algotrading_agent.observability.correlation_tracker import CorrelationTracker
-        from algotrading_agent.observability.trade_performance_tracker import TradePerformanceTracker
-        from algotrading_agent.observability.decision_analyzer import DecisionAnalyzer
-        from algotrading_agent.observability.trading_dashboard import TradingDashboard
+        # from algotrading_agent.observability.trade_performance_tracker import TradePerformanceTracker  # DELETED
+        # from algotrading_agent.observability.decision_analyzer import DecisionAnalyzer  # DELETED
         
-        # Initialize metrics collector
-        metrics_config = self.config.get('observability.metrics_collector', {})
-        self.metrics_collector = MetricsCollector(metrics_config)
+        # Note: ObservabilityService is initialized above, replacing MetricsCollector
         
         # Initialize correlation tracker
         correlation_config = self.config.get('observability.correlation_tracker', {'data_dir': '/app/data'})
         self.correlation_tracker = CorrelationTracker(correlation_config)
         
-        # Initialize trade performance tracker
-        trade_tracker_config = self.config.get('observability.trade_performance_tracker', {'data_dir': '/app/data'})
-        self.trade_performance_tracker = TradePerformanceTracker(trade_tracker_config)
-        
-        # Initialize decision analyzer
-        decision_analyzer_config = self.config.get('observability.decision_analyzer', {'data_dir': '/app/data'})
-        self.decision_analyzer = DecisionAnalyzer(decision_analyzer_config)
-        
-        # Initialize comprehensive trading dashboard
-        dashboard_config = self.config.get('observability.trading_dashboard', {})
-        self.trading_dashboard = TradingDashboard(
-            trade_tracker=self.trade_performance_tracker,
-            decision_analyzer=self.decision_analyzer,
-            correlation_tracker=self.correlation_tracker,
-            config=dashboard_config
-        )
+        # DELETED: trade_performance_tracker, decision_analyzer, trading_dashboard
+        # These are now replaced by ObservabilityService
         
         # Initialize Alpaca sync service for real data
         self.alpaca_sync = None  # Will be initialized after alpaca_client is ready
@@ -201,8 +183,7 @@ class AlgotradingAgent:
                 self._structured_handler = StructuredLogHandler(self.log_aggregator)
                 logging.getLogger().addHandler(self._structured_handler)
             
-            # Start metrics collector
-            self.metrics_collector.start()
+            # ObservabilityService is started above, no need for separate metrics collector
             
             # Start all components
             await self.news_scraper.start()
@@ -223,8 +204,7 @@ class AlgotradingAgent:
                     # Initialize Alpaca sync service for real data
                     self.alpaca_sync = AlpacaSyncService(
                         alpaca_client=self.alpaca_client,
-                        trade_tracker=self.trade_performance_tracker,
-                        metrics_collector=self.metrics_collector
+                        observability_service=self.observability
                     )
                     
                     # Do initial sync of real Alpaca data
@@ -278,8 +258,8 @@ class AlgotradingAgent:
         if self._structured_handler:
             logging.getLogger().removeHandler(self._structured_handler)
         
-        # Stop metrics collector
-        self.metrics_collector.stop()
+        # Stop observability service
+        await self.observability.stop()
         
         self.logger.info("Algotrading Agent stopped")
         
@@ -583,15 +563,8 @@ class AlgotradingAgent:
     async def _evaluate_alerts(self):
         """Evaluate alert conditions and send notifications"""
         try:
-            # Gather system metrics for alert evaluation
-            from algotrading_agent.observability.metrics_collector import MetricsCollector
-            metrics_collector = MetricsCollector(self.config.get('observability.metrics_collector', {}))
-            
-            # Collect current metrics
-            metrics = await metrics_collector.collect_metrics(
-                agent_ref=self,
-                alpaca_client=self.alpaca_client
-            )
+            # Get current metrics from ObservabilityService
+            metrics = await self.observability.get_current_metrics()
             
             # Convert metrics to dict for alert evaluation
             alert_data = metrics.to_dict() if hasattr(metrics, 'to_dict') else {}
@@ -612,10 +585,10 @@ class AlgotradingAgent:
             # Update active alerts list for dashboard
             self._active_alerts = self.alert_manager.get_active_alerts()
             
-            # Update metrics collector with correlation data
+            # Update observability service with correlation data
             if hasattr(self, 'correlation_tracker'):
                 correlation_metrics = self.correlation_tracker.get_prometheus_metrics()
-                self.metrics_collector.update_correlation_metrics(correlation_metrics)
+                # Note: ObservabilityService will handle correlation data differently
             
             # Generate session insights from decision analyzer
             if hasattr(self, 'decision_analyzer'):
