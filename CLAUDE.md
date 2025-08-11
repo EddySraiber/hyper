@@ -33,28 +33,8 @@ docker-compose exec algotrading-agent bash
 # View component status
 docker-compose exec algotrading-agent python -c "from main import AlgotradingAgent; print(AlgotradingAgent().get_status())"
 
-# Check trade safety status (verify all positions are protected)
-docker-compose exec algotrading-agent python -c "
-from algotrading_agent.trading.alpaca_client import AlpacaClient
-from algotrading_agent.config.settings import get_config
-import asyncio
-
-async def check_safety():
-    client = AlpacaClient(get_config().get_alpaca_config())
-    positions = await client.get_positions()
-    orders = await client.get_orders()
-    print(f'📊 Positions: {len(positions)}, Orders: {len(orders)}')
-    for pos in positions:
-        print(f'  {pos[\"symbol\"]}: {pos[\"quantity\"]} shares, P&L: \${pos[\"unrealized_pl\"]:.2f}')
-    if len(positions) > 0 and len(orders) >= len(positions):
-        print('✅ All positions appear to have protective orders')
-    elif len(positions) > 0:
-        print('⚠️ WARNING: Some positions may be unprotected!')
-    else:
-        print('ℹ️ No active positions')
-        
-asyncio.run(check_safety())
-"
+# Check trade safety status (comprehensive position protection analysis)
+docker-compose exec algotrading-agent python analysis/emergency_scripts/emergency_check_protection.py
 ```
 
 ### Optional Services
