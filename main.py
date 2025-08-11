@@ -18,7 +18,9 @@ from algotrading_agent.components.news_impact_scorer import NewsImpactScorer
 from algotrading_agent.components.decision_engine import DecisionEngine
 from algotrading_agent.components.risk_manager import RiskManager
 from algotrading_agent.components.statistical_advisor import StatisticalAdvisor
-from algotrading_agent.components.trade_manager import TradeManager
+from algotrading_agent.components.enhanced_trade_manager import EnhancedTradeManager
+from algotrading_agent.trading.position_protector import PositionProtector
+from algotrading_agent.trading.bracket_order_manager import BracketOrderManager
 from algotrading_agent.trading.alpaca_client import AlpacaClient
 from algotrading_agent.api.health import HealthServer
 from algotrading_agent.observability.service import ObservabilityService, ObservabilityConfig
@@ -64,16 +66,31 @@ class AlgotradingAgent:
         self.decision_engine = DecisionEngine(self.config.get_component_config('decision_engine'))
         self.risk_manager = RiskManager(self.config.get_component_config('risk_manager'))
         self.statistical_advisor = StatisticalAdvisor(self.config.get_component_config('statistical_advisor'))
-        self.trade_manager = TradeManager(self.config.get_component_config('trade_manager'))
+        # Enhanced trade management system
+        self.trade_manager = EnhancedTradeManager(self.config.get_component_config('trade_manager'))
+        
+        # Initialize safety components (will be connected after Alpaca client is ready)
+        self.position_protector = None
+        self.bracket_manager = None
         
         # Initialize trading client
         try:
             self.alpaca_client = AlpacaClient(self.config.get_alpaca_config())
+            # Initialize safety components now that we have Alpaca client
+            self.position_protector = PositionProtector(self.alpaca_client, self.config.get_component_config('enhanced_trade_manager.position_protector'))
+            self.bracket_manager = BracketOrderManager(self.alpaca_client, self.config.get_component_config('enhanced_trade_manager.bracket_order_manager'))
+            
             # Inject Alpaca client into components that need it
             self.decision_engine.alpaca_client = self.alpaca_client
             self.trade_manager.alpaca_client = self.alpaca_client
+            
             # Inject decision engine reference for failure feedback
             self.trade_manager.decision_engine = self.decision_engine
+            
+            # Connect enhanced trade management components
+            self.trade_manager.position_protector = self.position_protector
+            self.trade_manager.bracket_manager = self.bracket_manager
+            self.position_protector.trade_manager = self.trade_manager
         except Exception as e:
             self.logger.error(f"Failed to initialize Alpaca client: {e}")
             self.logger.info("Running in simulation mode without real trading")
@@ -193,7 +210,13 @@ class AlgotradingAgent:
             self.decision_engine.start()
             self.risk_manager.start()
             self.statistical_advisor.start()
+            
+            # Start enhanced trade management system
             self.trade_manager.start()
+            if self.position_protector:
+                asyncio.create_task(self.position_protector.start_monitoring())
+            if self.bracket_manager:
+                asyncio.create_task(self.bracket_manager.start_protection_monitoring())
             
             # Print account info if trading is enabled
             if self.alpaca_client:
@@ -248,7 +271,13 @@ class AlgotradingAgent:
         self.decision_engine.stop()
         self.risk_manager.stop()
         self.statistical_advisor.stop()
+        
+        # Stop enhanced trade management system
         self.trade_manager.stop()
+        if self.position_protector:
+            self.position_protector.stop_monitoring()
+        if self.bracket_manager:
+            self.bracket_manager.stop_protection_monitoring()
         
         # Stop health server
         self.health_server.stop()
@@ -526,7 +555,12 @@ class AlgotradingAgent:
         if not self.trade_manager:
             return
             
-        failures = self.trade_manager.get_failure_feedback()
+        # Check if trade manager has failure feedback method
+        if hasattr(self.trade_manager, 'get_failure_feedback'):
+            failures = self.trade_manager.get_failure_feedback()
+        else:
+            failures = []
+            
         if not failures:
             return
             
@@ -654,7 +688,9 @@ class AlgotradingAgent:
             'decision_engine': self.decision_engine.get_status(),
             'risk_manager': self.risk_manager.get_status(),
             'statistical_advisor': self.statistical_advisor.get_status(),
-            'trade_manager': self.trade_manager.get_status()
+            'trade_manager': self.trade_manager.get_status(),
+            'position_protector': {'is_running': getattr(self.position_protector, 'is_monitoring', False), 'status': 'monitoring' if self.position_protector else 'not_initialized'} if self.position_protector else {'is_running': False, 'status': 'not_initialized'},
+            'bracket_manager': {'is_running': getattr(self.bracket_manager, 'is_monitoring', False), 'status': 'monitoring' if self.bracket_manager else 'not_initialized'} if self.bracket_manager else {'is_running': False, 'status': 'not_initialized'}
         }
         
         portfolio_status = {}

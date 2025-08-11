@@ -173,6 +173,12 @@ class DecisionEngine(ComponentBase):
         pair.confidence = confidence
         pair.reasoning = self._generate_reasoning(news_items, signal_strength)
         
+        # MANDATORY BRACKET ORDER VALIDATION
+        validation_result = self._validate_bracket_order(pair)
+        if not validation_result["valid"]:
+            self.logger.warning(f"Bracket order validation failed for {symbol}: {validation_result['errors']}")
+            return None
+        
         return pair
         
     def _calculate_signal_strength(self, news_items: List[Dict[str, Any]]) -> float:
@@ -511,3 +517,78 @@ class DecisionEngine(ComponentBase):
         except Exception as e:
             self.logger.warning(f"Error in enhanced target adjustments: {e}")
             return None
+    
+    def _validate_bracket_order(self, pair: TradingPair) -> Dict[str, Any]:
+        """
+        Mandatory bracket order validation to ensure all trades have proper risk management.
+        This is a critical safety mechanism that prevents any trade without stop-loss/take-profit.
+        """
+        validation_result = {
+            "valid": True,
+            "errors": [],
+            "warnings": []
+        }
+        
+        # Critical validation: Stop-loss must be present
+        if pair.stop_loss is None:
+            validation_result["valid"] = False
+            validation_result["errors"].append("CRITICAL: Stop-loss is required for all trades")
+        
+        # Critical validation: Take-profit must be present
+        if pair.take_profit is None:
+            validation_result["valid"] = False
+            validation_result["errors"].append("CRITICAL: Take-profit is required for all trades")
+            
+        # Validate stop-loss placement (directionally correct)
+        if pair.stop_loss is not None:
+            if pair.action == "buy" and pair.stop_loss >= pair.entry_price:
+                validation_result["valid"] = False
+                validation_result["errors"].append(f"CRITICAL: Buy order stop-loss must be below entry price ({pair.stop_loss:.2f} >= {pair.entry_price:.2f})")
+            elif pair.action == "sell" and pair.stop_loss <= pair.entry_price:
+                validation_result["valid"] = False
+                validation_result["errors"].append(f"CRITICAL: Sell order stop-loss must be above entry price ({pair.stop_loss:.2f} <= {pair.entry_price:.2f})")
+                
+        # Validate take-profit placement (directionally correct)  
+        if pair.take_profit is not None:
+            if pair.action == "buy" and pair.take_profit <= pair.entry_price:
+                validation_result["valid"] = False
+                validation_result["errors"].append(f"CRITICAL: Buy order take-profit must be above entry price ({pair.take_profit:.2f} <= {pair.entry_price:.2f})")
+            elif pair.action == "sell" and pair.take_profit >= pair.entry_price:
+                validation_result["valid"] = False
+                validation_result["errors"].append(f"CRITICAL: Sell order take-profit must be below entry price ({pair.take_profit:.2f} >= {pair.entry_price:.2f})")
+        
+        # Validate minimum price differences (Alpaca requirements)
+        min_diff = 0.01
+        if pair.stop_loss is not None and abs(pair.stop_loss - pair.entry_price) < min_diff:
+            validation_result["valid"] = False
+            validation_result["errors"].append(f"CRITICAL: Stop-loss too close to entry price (minimum {min_diff})")
+            
+        if pair.take_profit is not None and abs(pair.take_profit - pair.entry_price) < min_diff:
+            validation_result["valid"] = False
+            validation_result["errors"].append(f"CRITICAL: Take-profit too close to entry price (minimum {min_diff})")
+        
+        # Risk/reward ratio validation (warning level)
+        if pair.stop_loss is not None and pair.take_profit is not None:
+            if pair.action == "buy":
+                risk = pair.entry_price - pair.stop_loss
+                reward = pair.take_profit - pair.entry_price
+            else:  # sell
+                risk = pair.stop_loss - pair.entry_price
+                reward = pair.entry_price - pair.take_profit
+                
+            if risk > 0 and reward > 0:
+                risk_reward_ratio = reward / risk
+                if risk_reward_ratio < 0.5:  # Risk more than 2x reward
+                    validation_result["warnings"].append(f"Poor risk/reward ratio: {risk_reward_ratio:.2f} (high risk)")
+                elif risk_reward_ratio > 3.0:  # Extremely favorable
+                    validation_result["warnings"].append(f"Unusually high risk/reward ratio: {risk_reward_ratio:.2f} (verify targets)")
+        
+        # Log validation results
+        if validation_result["errors"]:
+            self.logger.error(f"Bracket validation FAILED for {pair.symbol}: {'; '.join(validation_result['errors'])}")
+        elif validation_result["warnings"]:
+            self.logger.warning(f"Bracket validation warnings for {pair.symbol}: {'; '.join(validation_result['warnings'])}")
+        else:
+            self.logger.info(f"✅ Bracket validation PASSED for {pair.symbol} - Entry: ${pair.entry_price:.2f}, SL: ${pair.stop_loss:.2f}, TP: ${pair.take_profit:.2f}")
+            
+        return validation_result

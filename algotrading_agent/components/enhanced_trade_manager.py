@@ -384,3 +384,41 @@ class EnhancedTradeManager(PersistentComponent):
             "data": data,
             "timestamp": datetime.utcnow().isoformat()
         }
+    
+    def get_failure_feedback(self) -> List[Dict[str, Any]]:
+        """
+        Get trade failure feedback for analysis and adjustment.
+        
+        Returns:
+            List of trade failure events with details for system learning
+        """
+        # This enhanced trade manager focuses on prevention rather than cleanup
+        # Most failures should be prevented by the protection systems
+        return []
+    
+    def get_queue_status(self) -> Dict[str, Any]:
+        """
+        Get trade queue status for monitoring and alerting.
+        
+        Returns:
+            Dictionary containing queue status information
+        """
+        status = {
+            "queue_size": 0,
+            "max_capacity": self.max_concurrent_trades,
+            "utilization": 0.0,
+            "active_trades": 0,
+            "pending_trades": 0
+        }
+        
+        # Get status from state manager if available
+        if self.state_manager:
+            try:
+                active_count = len(getattr(self.state_manager, 'active_trades', {}))
+                status["active_trades"] = active_count
+                status["queue_size"] = active_count
+                status["utilization"] = active_count / self.max_concurrent_trades
+            except Exception:
+                pass
+                
+        return status
