@@ -82,6 +82,53 @@ news_analysis_brain:
     "record": 0.25
     "massive": 0.2
     "significant": 0.15
+  
+  # Sentiment Analysis Method Configuration
+  sentiment_analysis:
+    primary_method: "ml"              # Primary method: "ml", "ai", or "traditional"
+    fallback_enabled: true            # Enable fallback to traditional if primary fails
+    
+    # ML Sentiment Analysis Configuration
+    ml_enabled: true                  # Enable ML-based sentiment analysis
+    ml_weight: 0.6                    # Weight for ML analysis in ensemble (0.0-1.0)
+    ai_weight: 0.3                    # Weight for AI analysis (when used with ML)
+    traditional_weight: 0.1           # Weight for traditional TextBlob analysis
+    
+    # Performance thresholds
+    min_ml_confidence: 0.3            # Minimum confidence to trust ML predictions
+    high_ml_confidence: 0.7           # High confidence threshold for ML predictions
+
+# ML Sentiment Configuration
+ml_sentiment:
+  enabled: true                       # Enable ML sentiment analysis
+  model_dir: "/app/data/ml_models"    # Directory to store trained models
+  auto_train: true                    # Automatically train model on startup if none exists
+  retrain_threshold: 0.6              # Retrain if model accuracy falls below this threshold
+  
+  # Model training parameters
+  training:
+    test_size: 0.2                    # Proportion of data for testing (0.0-1.0)
+    cross_validation_folds: 5         # Number of CV folds for validation
+    random_state: 42                  # Random state for reproducibility
+    
+  # Feature engineering parameters
+  features:
+    max_tfidf_features: 1000          # Maximum TF-IDF features
+    ngram_range: [1, 2]               # N-gram range for TF-IDF
+    min_df: 2                         # Minimum document frequency
+    max_df: 0.8                       # Maximum document frequency
+    
+  # Model parameters
+  model:
+    n_estimators: 100                 # Number of trees in random forest
+    max_depth: 15                     # Maximum tree depth
+    min_samples_split: 5              # Minimum samples required to split
+    min_samples_leaf: 2               # Minimum samples required at leaf
+    class_weight: "balanced"          # Handle imbalanced classes
+    
+  # Performance and confidence thresholds
+  min_confidence: 0.3                 # Minimum confidence for predictions
+  high_confidence: 0.7                # High confidence threshold
 
 # AI Analyzer Configuration
 ai_analyzer:
@@ -173,7 +220,7 @@ news_impact_scorer:
 
 # Decision Engine Configuration
 decision_engine:
-  min_confidence: 0.05            # Lowered to 0.05 to generate more trades
+  min_confidence: 0.30            # Increased to 0.30 to improve signal quality and reduce noise trades
   max_position_size: 1000
   sentiment_weight: 0.4
   impact_weight: 0.4              # Increased impact weight
@@ -201,12 +248,18 @@ decision_engine:
 # Risk Manager Configuration
 risk_manager:
   max_portfolio_value: 100000     # $100k virtual money
-  max_position_pct: 0.05          # 5% per position
+  max_position_pct: 0.05          # 5% per position (fallback when Kelly not available)
   max_daily_loss_pct: 0.02        # 2% daily loss limit
   max_sector_exposure_pct: 0.20   # 20% per sector
   correlation_threshold: 0.7
   blacklisted_symbols:
     - "PENN"  # Example blacklisted symbol
+  
+  # Kelly Criterion Configuration
+  enable_kelly_criterion: true    # Enable Kelly Criterion position sizing
+  kelly_safety_factor: 0.25       # Conservative 25% of full Kelly (recommended)
+  max_kelly_position_pct: 0.10    # Maximum position size regardless of Kelly (10% cap)
+  min_trades_for_kelly: 20        # Minimum historical trades needed for Kelly calculation
 
 # Statistical Advisor Configuration
 statistical_advisor:
@@ -222,6 +275,54 @@ trade_manager:
   trade_timeout_hours: 24           # Cancel trades after 24 hours
   max_retries: 3                    # Maximum retry attempts for failed orders
   enable_dynamic_adjustments: true  # Enable stop-loss/take-profit adjustments
+
+# Enhanced Trade Manager Configuration - NEW ARCHITECTURE
+enhanced_trade_manager:
+  enabled: true                     # Enable new architecture (set to false for legacy mode)
+  max_concurrent_trades: 10         # Maximum concurrent trades
+  enable_legacy_compatibility: true # Enable legacy API compatibility
+  
+  # Bracket Order Manager Settings
+  bracket_order_manager:
+    max_concurrent_brackets: 10     # Maximum concurrent bracket orders
+    protection_check_interval: 30   # Protection monitoring interval (seconds)
+    emergency_liquidation_enabled: true  # Enable emergency liquidation
+    max_protection_failures: 3      # Max failures before emergency liquidation
+    
+  # Position Protector Settings  
+  position_protector:
+    check_interval: 30              # Position protection check interval (seconds)
+    max_protection_attempts: 5      # Maximum attempts to protect position
+    emergency_liquidation_enabled: true  # Emergency liquidation if protection fails
+    default_stop_loss_pct: 0.05     # Default 5% stop-loss
+    default_take_profit_pct: 0.10   # Default 10% take-profit
+    
+  # Order Reconciler Settings
+  order_reconciler:
+    reconciliation_interval: 60     # Order-position reconciliation interval (seconds)
+    stale_order_threshold_hours: 24 # Hours before order considered stale
+    auto_cleanup_enabled: true      # Auto-cancel orphaned orders
+    
+  # Trade State Manager Settings
+  trade_state_manager:
+    state_check_interval: 30        # Trade state check interval (seconds)
+    protection_check_interval: 60   # Protection status check interval (seconds)
+    max_trade_age_hours: 48         # Maximum trade age before forced closure
+    emergency_liquidation_enabled: true  # Emergency liquidation capability
+
+# Position Protection API Configuration
+protection_api:
+  enabled: true                     # Enable protection API endpoints
+  emergency_access_enabled: true   # Enable emergency liquidation endpoints
+  require_confirmation: false      # Require confirmation for emergency actions (disable for speed)
+  
+  # Protection defaults for API operations
+  default_stop_loss_pct: 0.05      # 5% default stop-loss
+  default_take_profit_pct: 0.10    # 10% default take-profit
+  
+  # Safety limits
+  max_positions_per_emergency: 50  # Max positions for bulk emergency operations
+  emergency_cooldown_minutes: 5    # Cooldown between emergency operations
 
 # Trailing Stop Manager Configuration
 trailing_stop_manager:

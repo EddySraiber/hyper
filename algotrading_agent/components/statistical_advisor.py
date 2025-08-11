@@ -1,4 +1,5 @@
-import numpy as np
+import statistics
+import math
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from ..core.base import PersistentComponent
@@ -128,9 +129,9 @@ class StatisticalAdvisor(PersistentComponent):
         return {
             "total_trades": len(symbol_trades),
             "win_rate": len([p for p in pnls if p > 0]) / len(pnls),
-            "avg_pnl": np.mean(pnls),
+            "avg_pnl": statistics.mean(pnls),
             "total_pnl": sum(pnls),
-            "volatility": np.std(pnls) if len(pnls) > 1 else 0.0,
+            "volatility": statistics.stdev(pnls) if len(pnls) > 1 else 0.0,
             "max_win": max(pnls),
             "max_loss": min(pnls)
         }
@@ -149,7 +150,7 @@ class StatisticalAdvisor(PersistentComponent):
         return {
             "total_trades": len(action_trades),
             "win_rate": len([p for p in pnls if p > 0]) / len(pnls),
-            "avg_pnl": np.mean(pnls),
+            "avg_pnl": statistics.mean(pnls),
             "sharpe_ratio": self._calculate_sharpe_ratio(pnls)
         }
         
@@ -169,7 +170,7 @@ class StatisticalAdvisor(PersistentComponent):
         
         return {
             "trades_at_confidence": len(similar_trades),
-            "avg_pnl": np.mean(pnls),
+            "avg_pnl": statistics.mean(pnls),
             "win_rate": len([p for p in pnls if p > 0]) / len(pnls),
             "confidence_reliability": self._calculate_confidence_reliability(similar_trades)
         }
@@ -191,12 +192,12 @@ class StatisticalAdvisor(PersistentComponent):
         if not recent_pnls:
             return {"trend": "unknown"}
             
-        avg_recent_pnl = np.mean(recent_pnls)
+        avg_recent_pnl = statistics.mean(recent_pnls)
         
         return {
             "recent_performance": avg_recent_pnl,
             "market_trend": "bullish" if avg_recent_pnl > 0 else "bearish",
-            "volatility": np.std(recent_pnls) if len(recent_pnls) > 1 else 0.0
+            "volatility": statistics.stdev(recent_pnls) if len(recent_pnls) > 1 else 0.0
         }
         
     def _analyze_timing_patterns(self) -> Dict[str, Any]:
@@ -218,7 +219,7 @@ class StatisticalAdvisor(PersistentComponent):
         best_hours = []
         for hour, pnls in hourly_performance.items():
             if len(pnls) >= 3:
-                avg_pnl = np.mean(pnls)
+                avg_pnl = statistics.mean(pnls)
                 if avg_pnl > 0:
                     best_hours.append((hour, avg_pnl))
                     
@@ -260,17 +261,67 @@ class StatisticalAdvisor(PersistentComponent):
             
         return min(max(adjusted_confidence, 0.1), 1.0)
         
-    def _calculate_sharpe_ratio(self, pnls: List[float]) -> float:
+    def _calculate_sharpe_ratio(self, pnls: List[float], risk_free_rate: float = 0.02, 
+                               periods_per_year: int = 252) -> float:
+        """
+        Calculate Sharpe ratio with proper risk-free rate and annualization.
+        """
         if len(pnls) < 2:
             return 0.0
-            
-        mean_return = np.mean(pnls)
-        std_return = np.std(pnls)
         
-        if std_return == 0:
+        # Assume initial capital for return calculation
+        initial_capital = 100000
+        returns = [pnl / initial_capital for pnl in pnls]
+        
+        if statistics.stdev(returns) == 0:
             return 0.0
+        
+        # Calculate daily risk-free rate
+        daily_risk_free = risk_free_rate / periods_per_year
+        
+        # Calculate excess returns
+        excess_returns = [r - daily_risk_free for r in returns]
+        
+        # Calculate Sharpe ratio and annualize
+        mean_excess = statistics.mean(excess_returns)
+        std_returns = statistics.stdev(returns)
+        
+        # Annualize assuming trades are roughly daily
+        sharpe_ratio = (mean_excess / std_returns) * math.sqrt(periods_per_year) if std_returns != 0 else 0
+        
+        return sharpe_ratio
+        
+    def _calculate_max_drawdown(self, pnls: List[float], initial_capital: float = 100000) -> float:
+        """
+        Calculate maximum drawdown correctly.
+        Drawdown = (Peak Value - Trough Value) / Peak Value
+        """
+        if not pnls:
+            return 0.0
+        
+        # Calculate cumulative P&L starting from initial capital
+        cumulative_pnl = [initial_capital]
+        running_total = initial_capital
+        
+        for pnl in pnls:
+            running_total += pnl
+            cumulative_pnl.append(running_total)
+        
+        # Calculate maximum drawdown
+        max_dd = 0.0
+        peak = cumulative_pnl[0]
+        
+        for value in cumulative_pnl:
+            # Update peak if we have a new high
+            if value > peak:
+                peak = value
             
-        return mean_return / std_return
+            # Calculate drawdown from peak
+            if peak > 0:
+                drawdown = (peak - value) / peak
+                max_dd = max(max_dd, drawdown)
+        
+        return max_dd
         
     def _calculate_confidence_reliability(self, trades: List[Dict[str, Any]]) -> float:
         # Calculate how well confidence predicts actual outcomes
@@ -298,12 +349,13 @@ class StatisticalAdvisor(PersistentComponent):
         return {
             "total_trades": len(self.trade_history),
             "total_pnl": sum(pnls),
-            "avg_pnl": np.mean(pnls),
+            "avg_pnl": statistics.mean(pnls),
             "win_rate": len([p for p in pnls if p > 0]) / len(pnls),
             "sharpe_ratio": self._calculate_sharpe_ratio(pnls),
+            "max_drawdown": self._calculate_max_drawdown(pnls),
             "max_win": max(pnls),
             "max_loss": min(pnls),
-            "volatility": np.std(pnls),
+            "volatility": statistics.stdev(pnls),
             "profit_factor": self._calculate_profit_factor(pnls)
         }
         

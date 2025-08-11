@@ -5,6 +5,7 @@ from textblob import TextBlob
 from datetime import datetime
 from ..core.base import ComponentBase
 from .ai_analyzer import AIAnalyzer
+from ..ml.ml_sentiment_analyzer import MLSentimentAnalyzer
 
 
 class NewsAnalysisBrain(ComponentBase):
@@ -14,40 +15,110 @@ class NewsAnalysisBrain(ComponentBase):
         self.entity_patterns = config.get("entity_patterns", {})
         self.impact_keywords = config.get("impact_keywords", {})
         
-        # Initialize AI analyzer if enabled
+        # Initialize analyzers based on configuration
+        self.analyzer_config = config.get("sentiment_analysis", {})
+        self.primary_method = self.analyzer_config.get("primary_method", "ml")  # ml, ai, or traditional
+        self.fallback_enabled = self.analyzer_config.get("fallback_enabled", True)
+        
+        # ML sentiment analyzer
+        self.ml_enabled = self.analyzer_config.get("ml_enabled", True)
+        self.ml_weight = self.analyzer_config.get("ml_weight", 0.6)
+        self.ml_analyzer = None
+        if self.ml_enabled:
+            self.ml_analyzer = MLSentimentAnalyzer(config)
+        
+        # Initialize AI analyzer if enabled (keeping existing functionality)
         ai_config = config.get("ai_analyzer", {})
         self.ai_enabled = ai_config.get("enabled", False)
-        self.ai_weight = ai_config.get("ai_weight", 0.7)
-        self.traditional_weight = ai_config.get("traditional_weight", 0.3)
+        self.ai_weight = self.analyzer_config.get("ai_weight", 0.3)
+        self.traditional_weight = self.analyzer_config.get("traditional_weight", 0.1)
         self.ai_analyzer = None
         if self.ai_enabled:
             self.ai_analyzer = AIAnalyzer(config)
         
     async def start(self) -> None:
         self.logger.info("Starting News Analysis Brain")
+        
+        # Start ML analyzer
+        if self.ml_analyzer:
+            await self.ml_analyzer.start()
+            if self.ml_analyzer.can_analyze():
+                self.logger.info("ML sentiment analysis enabled")
+            else:
+                self.logger.warning("ML sentiment analysis failed to initialize")
+        
+        # Start AI analyzer
         if self.ai_analyzer:
             await self.ai_analyzer.start()
             self.logger.info("AI-enhanced analysis enabled")
+            
         self.is_running = True
         
     async def stop(self) -> None:
         self.logger.info("Stopping News Analysis Brain")
+        
+        # Stop ML analyzer
+        if self.ml_analyzer:
+            await self.ml_analyzer.stop()
+            
+        # Stop AI analyzer
         if self.ai_analyzer:
             await self.ai_analyzer.stop()
+            
         self.is_running = False
         
     async def process(self, filtered_news: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if not self.is_running or not filtered_news:
             return []
         
-        # Enhanced AI-powered analysis
-        if self.ai_analyzer:
+        # Process based on primary method configuration
+        if self.primary_method == "ml" and self.ml_analyzer and self.ml_analyzer.can_analyze():
+            analyzed_items = await self._process_with_ml(filtered_news)
+        elif self.primary_method == "ai" and self.ai_analyzer:
             analyzed_items = await self._process_with_ai(filtered_news)
         else:
             analyzed_items = await self._process_traditional(filtered_news)
             
-        self.logger.info(f"Analyzed {len(analyzed_items)} news items")
+        self.logger.info(f"Analyzed {len(analyzed_items)} news items using {self.primary_method} method")
         return analyzed_items
+        
+    async def _process_with_ml(self, filtered_news: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process news with ML sentiment analysis as primary method"""
+        try:
+            analyzed_items = []
+            
+            for item in filtered_news:
+                try:
+                    # Get ML sentiment analysis
+                    text = f"{item.get('title', '')} {item.get('content', '')}"
+                    ml_result = await self.ml_analyzer.analyze_sentiment(text)
+                    
+                    # Get traditional analysis for entity extraction and other features
+                    traditional_analysis = self._analyze_item_traditional(item)
+                    
+                    # Create enhanced analysis combining ML + traditional
+                    enhanced_analysis = self._merge_ml_traditional_analysis(ml_result, traditional_analysis, item)
+                    item.update(enhanced_analysis)
+                    analyzed_items.append(item)
+                    
+                except Exception as e:
+                    self.logger.error(f"ML analysis failed for item, using fallback: {e}")
+                    if self.fallback_enabled:
+                        # Fallback to traditional analysis
+                        traditional_analysis = self._analyze_item_traditional(item)
+                        item.update(traditional_analysis)
+                        item['analysis_method'] = 'traditional_fallback'
+                        analyzed_items.append(item)
+            
+            self.logger.info(f"ML-enhanced analysis completed for {len(analyzed_items)} items")
+            return analyzed_items
+            
+        except Exception as e:
+            self.logger.error(f"ML analysis failed completely, falling back to traditional: {e}")
+            if self.fallback_enabled:
+                return await self._process_traditional(filtered_news)
+            else:
+                return []
         
     async def _process_with_ai(self, filtered_news: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Process news with AI enhancement"""
@@ -85,6 +156,77 @@ class NewsAnalysisBrain(ComponentBase):
                 self.logger.error(f"Error analyzing item: {e}")
                 
         return analyzed_items
+        
+    def _merge_ml_traditional_analysis(self, ml_result: Dict[str, Any], 
+                                     traditional: Dict[str, Any], 
+                                     item: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge ML sentiment analysis with traditional analysis"""
+        # Extract ML sentiment results
+        ml_sentiment = ml_result.get('polarity', 0.0)
+        ml_confidence = ml_result.get('confidence', 0.0)
+        ml_label = ml_result.get('sentiment', 'neutral')
+        
+        # Extract traditional sentiment
+        traditional_sentiment = traditional['sentiment']['polarity']
+        traditional_confidence = traditional['sentiment']['confidence']
+        
+        # Create weighted ensemble
+        ensemble_sentiment = (ml_sentiment * self.ml_weight + 
+                            traditional_sentiment * self.traditional_weight)
+        
+        # Combined confidence (use higher of the two)
+        combined_confidence = max(ml_confidence, traditional_confidence)
+        
+        # Determine final sentiment label based on ensemble
+        if ensemble_sentiment > self.sentiment_threshold:
+            final_label = "positive"
+        elif ensemble_sentiment < -self.sentiment_threshold:
+            final_label = "negative"
+        else:
+            final_label = "neutral"
+        
+        # Create enhanced analysis
+        enhanced_analysis = {
+            # Primary ML analysis
+            'ml_sentiment': ml_sentiment,
+            'ml_confidence': ml_confidence,
+            'ml_label': ml_label,
+            'ml_probabilities': ml_result.get('probabilities', {}),
+            'ml_model_accuracy': ml_result.get('model_accuracy', 0.0),
+            
+            # Traditional analysis backup
+            'traditional_sentiment': traditional_sentiment,
+            'traditional_confidence': traditional_confidence,
+            'traditional_label': traditional['sentiment']['label'],
+            
+            # Ensemble results (primary output)
+            'sentiment': {
+                'polarity': ensemble_sentiment,
+                'subjectivity': traditional['sentiment']['subjectivity'],  # Keep from traditional
+                'label': final_label,
+                'confidence': combined_confidence,
+                'method': 'ml_ensemble'
+            },
+            
+            # Keep traditional entity and event analysis
+            'entities': traditional['entities'],
+            'events': traditional['events'],
+            'impact_score': traditional['impact_score'],
+            
+            # Analysis metadata
+            'analysis_timestamp': datetime.utcnow().isoformat(),
+            'analysis_method': 'ml_enhanced',
+            'ml_enabled': True,
+            'confidence_level': ml_result.get('confidence_level', 'medium'),
+            
+            # Performance tracking
+            'analyzer_weights': {
+                'ml_weight': self.ml_weight,
+                'traditional_weight': self.traditional_weight
+            }
+        }
+        
+        return enhanced_analysis
         
     def _merge_ai_traditional_analysis(self, item: Dict[str, Any], traditional: Dict[str, Any]) -> Dict[str, Any]:
         """Merge AI analysis with traditional analysis for enhanced accuracy"""
