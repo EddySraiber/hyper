@@ -20,3 +20,6 @@ prometheus_client==0.17.1
 # Machine Learning for Sentiment Analysis
 scikit-learn==1.3.0
 joblib==1.3.2
+
+# Twitter API Integration (for social sentiment)
+# Note: Uses aiohttp and requests already included above

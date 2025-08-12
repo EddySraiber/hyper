@@ -568,6 +568,53 @@ trading_costs:
       sec_fee_rate: 0.0000278
       taf_fee_rate: 0.000166
   
+# Twitter Sentiment Analysis Configuration (DISABLED - No API Key Available)
+twitter:
+  enabled: false                        # DISABLED: Set to true when Twitter Bearer Token is available
+  bearer_token: ""                      # Twitter API v2 Bearer Token (set via environment variable TWITTER_BEARER_TOKEN)
+  
+  # Collection Settings
+  update_interval: 300                  # Collection interval in seconds (5 minutes)
+  max_results_per_query: 10             # Max tweets per API call (Twitter API v2 limit: 100)
+  max_symbols_per_cycle: 5              # Max symbols to process per cycle (rate limiting)
+  
+  # Symbol Tracking
+  tracked_symbols:                      # Symbols to monitor for Twitter sentiment
+    - "AAPL"
+    - "TSLA" 
+    - "GOOGL"
+    - "AMZN"
+    - "MSFT"
+    - "NVDA"
+    - "META"
+    - "SPY"
+    - "QQQ"
+    - "PLTR"
+  
+  # Analysis Timeframes
+  timeframes:                           # Analysis windows for sentiment signals
+    - "1h"                              # 1 hour window
+    - "4h"                              # 4 hour window  
+    - "12h"                             # 12 hour window
+  
+  # Search and Filtering
+  search_operators:
+    exclude_retweets: true              # Exclude retweets from analysis
+    exclude_replies: true               # Exclude replies from analysis
+    language: "en"                      # English tweets only
+    min_retweets: 2                     # Minimum retweets for inclusion
+    min_likes: 5                        # Minimum likes for inclusion
+  
+  # Signal Quality Thresholds
+  min_signal_quality: 0.4               # Minimum quality score for signals (0.0-1.0)
+  signal_cache_hours: 24                # Hours to cache sentiment signals
+  
+# Twitter Sentiment Processing Configuration
+twitter_sentiment:
+  min_tweets_for_signal: 5              # Minimum tweets required to generate a signal
+  sentiment_threshold: 0.1              # Minimum sentiment strength (-1.0 to 1.0)
+  confidence_threshold: 0.3             # Minimum confidence for actionable signals (0.0-1.0)
+
 # Logging Configuration
 logging:
   level: "INFO"
