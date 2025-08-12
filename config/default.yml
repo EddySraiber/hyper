@@ -9,7 +9,8 @@ app:
   
 # News Scraper Configuration
 news_scraper:
-  update_interval: 10  # 10 seconds for news-driven trading speed
+  update_interval: 60  # 60 seconds - optimized for RSS feed update frequency (RSS feeds typically update every 5-30 minutes)
+  max_age_minutes: 30  # Only process news from last 30 minutes to avoid stale content
   sources:
     - name: "Reuters Business"
       type: "rss"
@@ -286,14 +287,14 @@ enhanced_trade_manager:
   bracket_order_manager:
     max_concurrent_brackets: 10     # Maximum concurrent bracket orders
     protection_check_interval: 30   # Protection monitoring interval (seconds)
-    emergency_liquidation_enabled: true  # Enable emergency liquidation
-    max_protection_failures: 3      # Max failures before emergency liquidation
+    emergency_liquidation_enabled: false  # DISABLED - prevent aggressive liquidation
+    max_protection_failures: 10      # Increased threshold to prevent premature liquidation
     
   # Position Protector Settings  
   position_protector:
-    check_interval: 30              # Position protection check interval (seconds)
-    max_protection_attempts: 5      # Maximum attempts to protect position
-    emergency_liquidation_enabled: true  # Emergency liquidation if protection fails
+    check_interval: 300             # Increased to 5 minutes to reduce aggressive checks
+    max_protection_attempts: 2      # Reduced attempts to prevent loops
+    emergency_liquidation_enabled: false  # DISABLED - prevent aggressive liquidation of profitable positions
     default_stop_loss_pct: 0.05     # Default 5% stop-loss
     default_take_profit_pct: 0.10   # Default 10% take-profit
     
@@ -308,7 +309,7 @@ enhanced_trade_manager:
     state_check_interval: 30        # Trade state check interval (seconds)
     protection_check_interval: 60   # Protection status check interval (seconds)
     max_trade_age_hours: 48         # Maximum trade age before forced closure
-    emergency_liquidation_enabled: true  # Emergency liquidation capability
+    emergency_liquidation_enabled: false  # DISABLED - Emergency liquidation capability
 
 # Position Protection API Configuration
 protection_api:
