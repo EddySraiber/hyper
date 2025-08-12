@@ -615,6 +615,73 @@ twitter_sentiment:
   sentiment_threshold: 0.1              # Minimum sentiment strength (-1.0 to 1.0)
   confidence_threshold: 0.3             # Minimum confidence for actionable signals (0.0-1.0)
 
+# Reddit Sentiment Analysis Configuration
+reddit:
+  enabled: true                         # Enable Reddit sentiment collection (free API)
+  user_agent: "AlgoTradingAgent/1.0.0 (Financial Sentiment Analysis)"
+  
+  # Collection Settings
+  update_interval: 600                  # Collection interval in seconds (10 minutes - conservative)
+  tracked_symbols:                      # Symbols to monitor for sentiment
+    - "AAPL"
+    - "TSLA" 
+    - "GOOGL"
+    - "AMZN"
+    - "MSFT"
+    - "NVDA"
+    - "META"
+    - "SPY"
+    - "QQQ"
+    - "VTI"
+    - "GME"
+    - "AMC"
+    - "PLTR"
+    - "AMD"
+    - "NFLX"
+    - "ORCL"
+  max_symbols_per_cycle: 4              # Symbols to process per cycle (rate limiting)
+  
+  # Subreddit Configuration (high-quality financial communities)
+  subreddits:
+    - "investing"                       # High-quality investment discussions  
+    - "SecurityAnalysis"                # Fundamental analysis community
+    - "ValueInvesting"                  # Long-term value investing focus
+    - "stocks"                         # General stock discussions
+    - "StockMarket"                    # Market analysis and news
+    - "financialindependence"          # Long-term financial planning
+    - "dividends"                      # Dividend investing community
+    - "options"                        # Options trading (sophisticated)
+  
+  # Quality Filters
+  min_score: 10                         # Minimum upvotes for post inclusion
+  min_upvote_ratio: 0.7                 # Minimum upvote ratio (0.0-1.0)
+  min_comments: 5                       # Minimum comments for meaningful discussion
+  max_post_age_hours: 48                # Maximum post age to consider
+  
+  # Collection Configuration
+  max_posts_per_subreddit: 25           # Posts to fetch per subreddit
+  collect_comments: true                # Collect comments for deeper analysis
+  max_comments_per_post: 8              # Comments to analyze per post
+  request_delay: 1                      # Seconds between API requests
+  
+  # Analysis Timeframes
+  timeframes:
+    - "4h"                             # 4 hour sentiment window
+    - "12h"                            # 12 hour sentiment window
+    - "24h"                            # 24 hour sentiment window (daily)
+    - "3d"                             # 3 day sentiment window (weekly)
+  
+  # Signal Quality Thresholds
+  min_signal_quality: 0.5               # Minimum quality score for signals (0.0-1.0) - higher than Twitter
+  signal_cache_hours: 48                # Hours to cache sentiment signals (longer for Reddit)
+
+# Reddit Sentiment Processing Configuration
+reddit_sentiment:
+  min_posts_for_signal: 3               # Minimum posts required to generate a signal
+  sentiment_threshold: 0.1              # Minimum sentiment strength (-1.0 to 1.0)
+  confidence_threshold: 0.4             # Minimum confidence for actionable signals (higher than Twitter)
+  quality_threshold: 0.3                # Minimum discussion quality threshold
+
 # Logging Configuration
 logging:
   level: "INFO"
