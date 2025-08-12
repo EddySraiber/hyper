@@ -11,6 +11,7 @@ class NewsScraper(ComponentBase):
         super().__init__("news_scraper", config)
         self.sources = config.get("sources", [])
         self.update_interval = config.get("update_interval", 300)  # 5 minutes
+        self.max_age_minutes = config.get("max_age_minutes", 30)  # Default 30 minutes freshness
         self.session = None
         
     async def start(self) -> None:
@@ -56,17 +57,34 @@ class NewsScraper(ComponentBase):
                 content = await response.text()
                 feed = feedparser.parse(content)
                 
+                # Calculate freshness cutoff time
+                cutoff_time = datetime.utcnow() - timedelta(minutes=self.max_age_minutes)
+                
                 items = []
+                total_entries = len(feed.entries)
+                fresh_count = 0
+                
                 for entry in feed.entries:
+                    published_date = self._parse_date(entry.get("published"))
+                    
+                    # Skip news older than max_age_minutes
+                    if published_date < cutoff_time:
+                        continue
+                        
+                    fresh_count += 1
                     item = {
                         "title": entry.get("title", ""),
                         "content": entry.get("summary", ""),
                         "url": entry.get("link", ""),
-                        "published": self._parse_date(entry.get("published")),
+                        "published": published_date,
                         "source": source["name"],
+                        "age_minutes": (datetime.utcnow() - published_date).total_seconds() / 60,
                         "raw_data": entry
                     }
                     items.append(item)
+                
+                if total_entries > 0:
+                    self.logger.info(f"Filtered {source['name']}: {fresh_count}/{total_entries} items fresh (within {self.max_age_minutes} min)")
                     
                 return items
         except Exception as e:

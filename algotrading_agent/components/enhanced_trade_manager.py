@@ -15,6 +15,7 @@ from ..trading.bracket_order_manager import BracketOrderManager
 from ..trading.position_protector import PositionProtector
 from ..trading.order_reconciler import OrderReconciler
 from ..trading.trade_state_manager import TradeStateManager
+from ..trading.universal_client import UniversalTradingClient
 from .decision_engine import TradingPair
 
 
@@ -39,6 +40,7 @@ class EnhancedTradeManager(PersistentComponent):
         
         # External dependencies (injected by main app)
         self.alpaca_client: Optional[AlpacaClient] = None
+        self.universal_client: Optional[UniversalTradingClient] = None
         self.decision_engine = None
         
         # Core architecture components
@@ -56,11 +58,15 @@ class EnhancedTradeManager(PersistentComponent):
         
     def start(self) -> None:
         """Initialize all components and start protection systems"""
-        if not self.alpaca_client:
-            self.logger.error("Cannot start without Alpaca client")
+        if not self.alpaca_client and not self.universal_client:
+            self.logger.error("Cannot start without trading client (Alpaca or Universal)")
             return
             
+        # Use universal client if available, otherwise fall back to Alpaca
+        self.current_trading_client = self.universal_client or self.alpaca_client
+            
         self.logger.info("🚀 Starting Enhanced Trade Manager")
+        self.logger.info(f"Using {'Universal' if self.universal_client else 'Alpaca'} trading client")
         self.is_running = True
         
         try:
@@ -99,20 +105,20 @@ class EnhancedTradeManager(PersistentComponent):
         bracket_config = {
             "max_concurrent_brackets": self.max_concurrent_trades,
             "protection_check_interval": 30,
-            "emergency_liquidation_enabled": True,
-            "max_protection_failures": 3
+            "emergency_liquidation_enabled": False,  # Disabled after previous fixes
+            "max_protection_failures": 10
         }
-        self.bracket_manager = BracketOrderManager(self.alpaca_client, bracket_config)
+        self.bracket_manager = BracketOrderManager(self.current_trading_client, bracket_config)
         
         # Initialize PositionProtector
         protector_config = {
-            "check_interval": 30,
-            "max_protection_attempts": 5,
-            "emergency_liquidation_enabled": True,
+            "check_interval": 300,  # 5 minutes - reduced aggressive checking
+            "max_protection_attempts": 2,
+            "emergency_liquidation_enabled": False,  # Disabled after previous fixes
             "default_stop_loss_pct": 0.05,
             "default_take_profit_pct": 0.10
         }
-        self.position_protector = PositionProtector(self.alpaca_client, protector_config)
+        self.position_protector = PositionProtector(self.current_trading_client, protector_config)
         
         # Initialize OrderReconciler
         reconciler_config = {
@@ -120,16 +126,16 @@ class EnhancedTradeManager(PersistentComponent):
             "stale_order_threshold_hours": 24,
             "auto_cleanup_enabled": True
         }
-        self.order_reconciler = OrderReconciler(self.alpaca_client, reconciler_config)
+        self.order_reconciler = OrderReconciler(self.current_trading_client, reconciler_config)
         
         # Initialize TradeStateManager
         state_config = {
             "state_check_interval": 30,
             "protection_check_interval": 60,
             "max_trade_age_hours": 48,
-            "emergency_liquidation_enabled": True
+            "emergency_liquidation_enabled": False  # Disabled after previous fixes
         }
-        self.state_manager = TradeStateManager(self.alpaca_client, state_config)
+        self.state_manager = TradeStateManager(self.current_trading_client, state_config)
         
         self.logger.info("✅ All components initialized")
     

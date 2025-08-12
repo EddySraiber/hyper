@@ -47,6 +47,7 @@ class DecisionEngine(ComponentBase):
         self.default_stop_loss_pct = config.get("default_stop_loss_pct", 0.05)
         self.default_take_profit_pct = config.get("default_take_profit_pct", 0.10)
         self.alpaca_client = None  # Will be injected by main app
+        self.universal_client = None  # Will be injected by main app for crypto support
         self.news_impact_scorer = None  # Will be injected by main app for enhanced analysis
         
         # Enhanced parameters for temporal and context analysis
@@ -68,10 +69,29 @@ class DecisionEngine(ComponentBase):
         if not self.is_running or not analyzed_news:
             return []
             
-        # Check if market is open before generating any trading decisions
-        if self.alpaca_client and not await self.alpaca_client.is_market_open():
-            self.logger.info("Market is closed - skipping trading decision generation (rest mode)")
+        # Check market status for different asset classes
+        stock_market_open = False
+        crypto_market_open = False
+        
+        if self.alpaca_client:
+            stock_market_open = await self.alpaca_client.is_market_open()
+        
+        if self.universal_client:
+            # Universal client can trade crypto 24/7
+            crypto_market_open = await self.universal_client.is_market_open()
+        
+        # If no markets are open, skip all trading
+        if not stock_market_open and not crypto_market_open:
+            self.logger.info("All markets closed - no trading possible")
             return []
+        
+        # Log market status
+        if stock_market_open and crypto_market_open:
+            self.logger.info("🟢 All markets open - stock and crypto trading active")
+        elif stock_market_open:
+            self.logger.info("📈 Stock market open - stock trading only")
+        elif crypto_market_open:
+            self.logger.info("₿ Crypto markets open - crypto trading only (24/7)")
             
         trading_pairs = []
         
@@ -80,6 +100,11 @@ class DecisionEngine(ComponentBase):
         
         for symbol, news_items in symbol_news.items():
             try:
+                # Check if we can trade this symbol based on market status
+                can_trade_symbol = self._can_trade_symbol(symbol, stock_market_open, crypto_market_open)
+                if not can_trade_symbol:
+                    continue
+                    
                 decision = await self._make_decision(symbol, news_items, market_data)
                 if decision:
                     trading_pairs.append(decision)
@@ -106,6 +131,32 @@ class DecisionEngine(ComponentBase):
                 symbol_groups[ticker].append(item)
                 
         return symbol_groups
+    
+    def _can_trade_symbol(self, symbol: str, stock_market_open: bool, crypto_market_open: bool) -> bool:
+        """Check if we can trade a symbol based on current market status"""
+        
+        # Detect asset class for the symbol
+        if self.universal_client and hasattr(self.universal_client, 'detect_asset_class'):
+            try:
+                asset_class = self.universal_client.detect_asset_class(symbol)
+                
+                if asset_class.value == 'crypto':
+                    return crypto_market_open
+                elif asset_class.value in ['stock', 'etf']:
+                    return stock_market_open
+                else:
+                    # Unknown asset class, default to stock market rules
+                    return stock_market_open
+            except Exception as e:
+                self.logger.warning(f"Error detecting asset class for {symbol}: {e}")
+        
+        # Fallback: Simple crypto detection
+        crypto_indicators = ['USDT', 'USDC', 'BUSD', 'BTC', 'ETH']
+        if any(indicator in symbol.upper() for indicator in crypto_indicators):
+            return crypto_market_open
+        
+        # Default to stock market rules
+        return stock_market_open
         
     def _extract_tickers_fallback(self, item: Dict[str, Any]) -> List[str]:
         # Disabled fallback extraction to avoid false positives

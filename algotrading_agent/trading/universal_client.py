@@ -424,3 +424,48 @@ class UniversalTradingClient:
                 health_status['overall_healthy'] = False
         
         return health_status
+    
+    # Compatibility methods for legacy components (Position Protector, etc.)
+    async def get_positions(self) -> List[Dict[str, Any]]:
+        """Legacy compatibility: Route to get_unified_positions"""
+        return await self.get_unified_positions()
+    
+    async def get_account_info(self) -> Dict[str, Any]:
+        """Legacy compatibility: Route to get_unified_account_info"""  
+        return await self.get_unified_account_info()
+    
+    async def get_orders(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Legacy compatibility: Get orders from all exchanges"""
+        all_orders = []
+        
+        for exchange, client in self.clients.items():
+            try:
+                if hasattr(client, 'get_orders'):
+                    orders = await client.get_orders(status=status)
+                    # Add exchange info to each order
+                    for order in orders:
+                        order['exchange'] = exchange.value
+                    all_orders.extend(orders)
+            except Exception as e:
+                self.logger.warning(f"Failed to get orders from {exchange.value}: {e}")
+        
+        return all_orders
+    
+    async def is_market_open(self) -> bool:
+        """Check if any markets are open (crypto is always open, stocks depend on Alpaca)"""
+        # Crypto markets are always open
+        if ExchangeType.BINANCE in self.clients:
+            return True
+        
+        # Check stock market status via Alpaca
+        if ExchangeType.ALPACA in self.clients:
+            try:
+                return await self.clients[ExchangeType.ALPACA].is_market_open()
+            except Exception as e:
+                self.logger.warning(f"Failed to check Alpaca market status: {e}")
+        
+        return False
+    
+    async def execute_trading_pair(self, pair: TradingPair, **kwargs) -> Dict[str, Any]:
+        """Legacy compatibility: Route to route_trade"""
+        return await self.route_trade(pair)

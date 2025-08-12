@@ -22,6 +22,7 @@ from algotrading_agent.components.enhanced_trade_manager import EnhancedTradeMan
 from algotrading_agent.trading.position_protector import PositionProtector
 from algotrading_agent.trading.bracket_order_manager import BracketOrderManager
 from algotrading_agent.trading.alpaca_client import AlpacaClient
+from algotrading_agent.trading.universal_client import UniversalTradingClient
 from algotrading_agent.api.health import HealthServer
 from algotrading_agent.observability.service import ObservabilityService, ObservabilityConfig
 from algotrading_agent.observability.schemas.live_metrics import ComponentStatus
@@ -73,16 +74,33 @@ class AlgotradingAgent:
         self.position_protector = None
         self.bracket_manager = None
         
-        # Initialize trading client
+        # Initialize trading clients
         try:
             self.alpaca_client = AlpacaClient(self.config.get_alpaca_config())
-            # Initialize safety components now that we have Alpaca client
+            
+            # Initialize Universal Trading Client if enabled
+            universal_config = self.config.get('universal_trading', {})
+            if universal_config.get('enabled', False):
+                self.logger.info("🚀 Initializing Universal Trading Client for multi-asset support")
+                self.universal_client = UniversalTradingClient(self.config)
+                # Inject both clients into trade manager
+                self.trade_manager.alpaca_client = self.alpaca_client
+                self.trade_manager.universal_client = self.universal_client
+                self.logger.info("✅ Multi-asset trading enabled (Stocks + Crypto)")
+            else:
+                self.universal_client = None
+                # Only use Alpaca client
+                self.trade_manager.alpaca_client = self.alpaca_client
+                self.logger.info("📈 Stock trading only (crypto disabled)")
+            
+            # Initialize safety components with Alpaca client (legacy compatibility)
             self.position_protector = PositionProtector(self.alpaca_client, self.config.get_component_config('enhanced_trade_manager.position_protector'))
             self.bracket_manager = BracketOrderManager(self.alpaca_client, self.config.get_component_config('enhanced_trade_manager.bracket_order_manager'))
             
-            # Inject Alpaca client into components that need it
+            # Inject clients into decision engine
             self.decision_engine.alpaca_client = self.alpaca_client
-            self.trade_manager.alpaca_client = self.alpaca_client
+            if self.universal_client:
+                self.decision_engine.universal_client = self.universal_client
             
             # Inject decision engine reference for failure feedback
             self.trade_manager.decision_engine = self.decision_engine
@@ -300,19 +318,35 @@ class AlgotradingAgent:
             try:
                 start_time = datetime.utcnow()
                 
-                # Check market hours - enter rest mode if markets closed
-                market_open = False
+                # Check market hours - consider both stock and crypto markets
+                stock_market_open = False
+                crypto_market_open = False
+                
                 if self.alpaca_client:
                     try:
-                        market_open = await self.alpaca_client.is_market_open()
+                        stock_market_open = await self.alpaca_client.is_market_open()
                     except Exception as e:
-                        self.logger.warning(f"Could not check market status: {e}")
-                        market_open = False
+                        self.logger.warning(f"Could not check stock market status: {e}")
+                
+                if self.universal_client:
+                    try:
+                        crypto_market_open = await self.universal_client.is_market_open()
+                    except Exception as e:
+                        self.logger.warning(f"Could not check crypto market status: {e}")
+                
+                # Any market open = trading available
+                market_open = stock_market_open or crypto_market_open
                 
                 # Log market status transitions (only when status changes)
                 if self._last_market_status != market_open:
                     if not market_open:
-                        self.logger.info("🛌 ENTERING REST MODE: Markets closed - switching to news analysis only")
+                        self.logger.info("🛌 ENTERING REST MODE: All markets closed - news analysis only")
+                    elif stock_market_open and crypto_market_open:
+                        self.logger.info("🟢 ACTIVE TRADING MODE: Stock + Crypto markets open")
+                    elif stock_market_open:
+                        self.logger.info("📈 STOCK TRADING MODE: Stock market open, crypto always available")
+                    elif crypto_market_open:
+                        self.logger.info("₿ CRYPTO TRADING MODE: Stock market closed, crypto 24/7 available")
                     else:
                         self.logger.info("📈 ENTERING ACTIVE MODE: Markets opened - full trading pipeline activated")
                     self._last_market_status = market_open
@@ -367,7 +401,7 @@ class AlgotradingAgent:
                 
                 # Skip trading pipeline if markets are closed (rest mode)
                 if not market_open:
-                    self.logger.info("⏸️  Skipping trading pipeline - markets closed")
+                    self.logger.info("⏸️  Skipping trading pipeline - all markets closed")
                     # Clear previous decisions in rest mode
                     self._last_decisions = []
                 else:

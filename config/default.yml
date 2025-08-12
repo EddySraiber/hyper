@@ -472,6 +472,63 @@ alpaca:
   # API keys should be set via environment variables:
   # ALPACA_API_KEY and ALPACA_SECRET_KEY
 
+# Binance Crypto Trading Configuration
+binance:
+  enabled: true                         # Enable crypto trading (24/7 markets)
+  testnet: true                         # Use testnet for safe testing (disable for live trading)
+  base_url: "https://testnet.binance.vision"  # Testnet URL
+  api_key_env: "BINANCE_API_KEY"        # Environment variable for API key
+  secret_key_env: "BINANCE_SECRET_KEY"  # Environment variable for secret key
+  
+  # Rate Limiting (Binance free tier)
+  rate_limit_requests: 1200             # Max requests per minute
+  rate_limit_weight: 6000               # Max weight per minute
+  
+  # Supported Trading Pairs
+  supported_pairs:
+    - "BTCUSDT"                         # Bitcoin/USDT
+    - "ETHUSDT"                         # Ethereum/USDT  
+    - "BNBUSDT"                         # Binance Coin/USDT
+    - "ADAUSDT"                         # Cardano/USDT
+    - "SOLUSDT"                         # Solana/USDT
+    - "DOGEUSDT"                        # Dogecoin/USDT
+    - "XRPUSDT"                         # Ripple/USDT
+    - "DOTUSDT"                         # Polkadot/USDT
+  
+  # Trading Limits
+  min_trade_amount: 10.0                # Minimum trade amount in USDT
+  max_trade_amount: 1000.0              # Maximum trade amount in USDT
+  
+  # Risk Management
+  price_deviation_threshold: 0.02       # 2% price deviation tolerance
+  order_timeout_seconds: 30             # Order timeout in seconds
+
+# Universal Trading Client Configuration
+universal_trading:
+  enabled: true                         # Enable multi-asset trading routing
+  
+  # Asset Class Routing Rules
+  routing_rules:
+    stocks:
+      exchange: "alpaca"                # Route stocks to Alpaca
+      active_hours: "market_hours"      # Only during US market hours
+    etfs:
+      exchange: "alpaca"                # Route ETFs to Alpaca  
+      active_hours: "market_hours"      # Only during US market hours
+    crypto:
+      exchange: "binance"               # Route crypto to Binance
+      active_hours: "24/7"              # Crypto markets never close
+  
+  # Performance Optimization
+  batch_processing: true                # Enable batch order processing
+  parallel_execution: true             # Execute orders in parallel when possible
+  failover_enabled: true               # Enable exchange failover
+  
+  # Cross-Asset Portfolio Management
+  enable_correlation_analysis: true    # Analyze correlations across asset classes
+  max_cross_asset_exposure: 0.15       # Max 15% exposure correlation across assets
+  rebalancing_enabled: false           # Disable auto-rebalancing for now
+
 # Trading Costs Configuration
 trading_costs:
   # Paper trading vs live trading
