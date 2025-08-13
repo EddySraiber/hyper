@@ -21,5 +21,10 @@ prometheus_client==0.17.1
 scikit-learn==1.3.0
 joblib==1.3.2
 
+# Enhanced News Scraping Dependencies
+beautifulsoup4==4.12.2  # HTML parsing for full article extraction
+lxml==4.9.3             # Fast XML/HTML parser
+websockets>=10.2,<11.0  # WebSocket client for real-time feeds (compatible with alpaca-py)
+
 # Twitter API Integration (for social sentiment)
 # Note: Uses aiohttp and requests already included above

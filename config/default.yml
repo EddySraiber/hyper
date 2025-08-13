@@ -7,10 +7,85 @@ app:
   log_level: "INFO"
   data_dir: "/app/data"
   
-# News Scraper Configuration
+# Enhanced News Scraper Configuration
+enhanced_news_scraper:
+  enabled: true               # Enable enhanced scraper (fallback to legacy if fails)
+  update_interval: 45         # 45 seconds for enhanced scraping
+  max_age_minutes: 30         # Only process news from last 30 minutes
+  max_concurrent_requests: 10 # Concurrent scraping limit
+  enable_full_content: true   # Extract full articles beyond RSS summaries
+  enable_deduplication: true  # Remove duplicate articles
+  retry_failed_sources: true  # Retry failed sources
+  max_failures_before_disable: 5  # Disable source after consecutive failures
+  
+  # Legacy RSS Sources (existing)
+  sources:
+    - name: "Reuters Business"
+      type: "rss"
+      url: "https://feeds.reuters.com/reuters/businessNews"
+      priority: 1  # 1=high, 2=medium, 3=low
+    - name: "Yahoo Finance"
+      type: "rss" 
+      url: "https://feeds.finance.yahoo.com/rss/2.0/headline"
+      priority: 2
+    - name: "MarketWatch"
+      type: "rss"
+      url: "http://feeds.marketwatch.com/marketwatch/marketpulse/"
+      priority: 2
+    - name: "Seeking Alpha"
+      type: "rss"
+      url: "https://seekingalpha.com/market_currents.xml"
+      priority: 2
+    - name: "Bloomberg Markets"
+      type: "rss"
+      url: "https://feeds.bloomberg.com/markets/news.rss"
+      priority: 1
+    - name: "CNBC Markets"
+      type: "rss"
+      url: "https://www.cnbc.com/id/15839135/device/rss/rss.html"
+      priority: 2
+  
+  # Enhanced API Sources (real-time financial news APIs)
+  api_sources:
+    - name: "Alpha Vantage News"
+      type: "api"
+      url: "https://www.alphavantage.co/query?function=NEWS_SENTIMENT&topics=financial_markets,earnings&sort=LATEST&limit=50"
+      enabled: true
+      priority: 1
+      rate_limit: 5.0  # 5 seconds between requests (free tier limit)
+      api_key_env: "ALPHA_VANTAGE_API_KEY"
+    - name: "Finnhub Market News"
+      type: "api" 
+      url: "https://finnhub.io/api/v1/news?category=general"
+      enabled: false  # Disabled until API key configured
+      priority: 1
+      rate_limit: 1.0
+      api_key_env: "FINNHUB_API_KEY"
+    - name: "IEX Cloud News"
+      type: "api"
+      url: "https://cloud.iexapis.com/stable/news/last/50"
+      enabled: false  # Disabled until API key configured  
+      priority: 2
+      rate_limit: 1.0
+      api_key_env: "IEX_CLOUD_API_KEY"
+  
+  # WebSocket Real-time Sources (future enhancement)
+  websocket_sources:
+    - name: "Finnhub WebSocket"
+      type: "websocket"
+      url: "wss://ws.finnhub.io"
+      enabled: false  # Disabled until API key configured
+      api_key_env: "FINNHUB_API_KEY"
+    - name: "Alpha Vantage WebSocket"
+      type: "websocket" 
+      url: "wss://ws.alphavantage.co"
+      enabled: false  # Not available in free tier
+      api_key_env: "ALPHA_VANTAGE_API_KEY"
+
+# Legacy News Scraper Configuration (for backward compatibility)
 news_scraper:
-  update_interval: 60  # 60 seconds - optimized for RSS feed update frequency (RSS feeds typically update every 5-30 minutes)
-  max_age_minutes: 30  # Only process news from last 30 minutes to avoid stale content
+  update_interval: 60
+  max_age_minutes: 30
   sources:
     - name: "Reuters Business"
       type: "rss"

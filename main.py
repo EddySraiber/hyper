@@ -12,6 +12,7 @@ from typing import List, Dict, Any
 
 from algotrading_agent.config.settings import get_config
 from algotrading_agent.components.news_scraper import NewsScraper
+from algotrading_agent.components.enhanced_news_scraper import EnhancedNewsScraper
 from algotrading_agent.components.news_filter import NewsFilter
 from algotrading_agent.components.news_analysis_brain import NewsAnalysisBrain
 from algotrading_agent.components.news_impact_scorer import NewsImpactScorer
@@ -59,8 +60,18 @@ class AlgotradingAgent:
         self.logger = self._setup_logging()
         self.running = False
         
-        # Initialize components
-        self.news_scraper = NewsScraper(self.config.get_component_config('news_scraper'))
+        # Initialize components - Enhanced News Scraper with fallback
+        use_enhanced_scraper = self.config.get('enhanced_news_scraper.enabled', True)
+        
+        if use_enhanced_scraper:
+            try:
+                self.news_scraper = EnhancedNewsScraper(self.config.get_component_config('enhanced_news_scraper'))
+                self.logger.info("🚀 Using Enhanced News Scraper with API integrations")
+            except Exception as e:
+                self.logger.warning(f"Enhanced scraper failed, falling back to legacy: {e}")
+                self.news_scraper = NewsScraper(self.config.get_component_config('news_scraper'))
+        else:
+            self.news_scraper = NewsScraper(self.config.get_component_config('news_scraper'))
         self.news_filter = NewsFilter(self.config.get_component_config('news_filter'))
         self.news_brain = NewsAnalysisBrain(self.config.get_component_config('news_analysis_brain'))
         self.news_impact_scorer = NewsImpactScorer(self.config.get_component_config('news_impact_scorer'))

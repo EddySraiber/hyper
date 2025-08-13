@@ -108,6 +108,11 @@ class DecisionEngine(ComponentBase):
                 can_trade_symbol = self._can_trade_symbol(symbol, stock_market_open, crypto_market_open)
                 if not can_trade_symbol:
                     continue
+                
+                # CRITICAL: Check if we already have a position or pending order for this symbol
+                if await self._has_existing_position_or_order(symbol):
+                    self.logger.info(f"⏭️  Skipping {symbol} - already have position or pending order")
+                    continue
                     
                 decision = await self._make_decision(symbol, news_items, market_data)
                 if decision:
@@ -647,3 +652,52 @@ class DecisionEngine(ComponentBase):
             self.logger.info(f"✅ Bracket validation PASSED for {pair.symbol} - Entry: ${pair.entry_price:.2f}, SL: ${pair.stop_loss:.2f}, TP: ${pair.take_profit:.2f}")
             
         return validation_result
+    
+    async def _has_existing_position_or_order(self, symbol: str) -> bool:
+        """
+        Check if we already have an existing position or pending order for this symbol.
+        This prevents infinite loops where the same trading decision is generated repeatedly.
+        """
+        try:
+            # Check if we have access to trading clients
+            trading_client = None
+            
+            # Try universal client first (supports both stocks and crypto)
+            if self.universal_client:
+                trading_client = self.universal_client
+            elif self.alpaca_client:
+                trading_client = self.alpaca_client
+            
+            if not trading_client:
+                self.logger.warning(f"No trading client available to check {symbol} position/orders")
+                return False
+            
+            # Check for existing positions
+            try:
+                positions = await trading_client.get_positions()
+                for position in positions:
+                    if position.get("symbol") == symbol and position.get("quantity", 0) != 0:
+                        self.logger.info(f"🔒 {symbol} already has position: {position.get('quantity')} shares")
+                        return True
+            except Exception as e:
+                self.logger.warning(f"Error checking positions for {symbol}: {e}")
+            
+            # Check for pending orders
+            try:
+                orders = await trading_client.get_orders()
+                pending_statuses = ['new', 'partially_filled', 'pending_new', 'accepted', 'pending_cancel']
+                
+                for order in orders:
+                    if (order.get("symbol") == symbol and 
+                        order.get("status") in pending_statuses):
+                        self.logger.info(f"🔒 {symbol} already has pending order: {order.get('side')} {order.get('quantity')} ({order.get('status')})")
+                        return True
+            except Exception as e:
+                self.logger.warning(f"Error checking orders for {symbol}: {e}")
+            
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"Error in _has_existing_position_or_order for {symbol}: {e}")
+            # Err on the side of caution - assume we have a position to prevent loops
+            return True
