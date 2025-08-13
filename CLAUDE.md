@@ -35,6 +35,9 @@ docker-compose exec algotrading-agent python -c "from main import AlgotradingAge
 
 # Check trade safety status (comprehensive position protection analysis)
 docker-compose exec algotrading-agent python analysis/emergency_scripts/emergency_check_protection.py
+
+# Test Guardian Service (high-frequency leak detection)
+docker-compose exec algotrading-agent python tests/guardian_test.py
 ```
 
 ### Optional Services
@@ -67,16 +70,19 @@ The system implements **comprehensive trade pairs safety** with multiple layers 
 
 1. **Enhanced Trade Manager** - Central orchestrator ensuring all trades are properly managed
 2. **Bracket Order Manager** - Enforces atomic bracket orders (entry + stop-loss + take-profit)  
-3. **Position Protector** - Continuous monitoring for unprotected positions with auto-protection
-4. **Order Reconciler** - Reconciles positions with orders, cleans up orphaned orders
-5. **Trade State Manager** - Complete trade lifecycle management with recovery mechanisms
+3. **Position Protector** - Continuous monitoring for unprotected positions with auto-protection (10min frequency)
+4. **🛡️ Guardian Service** - High-frequency leak detection and remediation (30-second scans)
+5. **Order Reconciler** - Reconciles positions with orders, cleans up orphaned orders
+6. **Trade State Manager** - Complete trade lifecycle management with recovery mechanisms
 
 **Key Safety Features:**
 - **100% Position Protection** - Every position MUST have stop-loss and take-profit orders
 - **No Naked Trades** - Bracket order validation prevents unprotected positions  
-- **Continuous Monitoring** - 30-second protection checks ensure no hanging trades
-- **Emergency Recovery** - Automatic protection and liquidation capabilities
-- **Multi-layer Validation** - Decision engine, trade manager, and position protector all enforce safety
+- **High-Frequency Leak Detection** - Guardian Service scans every 30 seconds for unsafe positions
+- **Multi-Layer Protection** - Position Protector (10min) + Guardian Service (30sec) + Manual Emergency Scripts
+- **Smart Leak Classification** - Detects test orders, crypto issues, failed brackets, orphaned positions
+- **Automatic Remediation** - Guardian Service attempts to fix leaks before emergency liquidation
+- **Emergency Recovery** - Automatic protection and liquidation capabilities for critical leaks
 
 ### 6 Core Components
 - **NewsScraper** (`algotrading_agent/components/news_scraper.py`) - RSS feed collection from Reuters, Yahoo Finance, MarketWatch

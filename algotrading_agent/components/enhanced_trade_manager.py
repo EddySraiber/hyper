@@ -15,6 +15,7 @@ from ..trading.bracket_order_manager import BracketOrderManager
 from ..trading.position_protector import PositionProtector
 from ..trading.order_reconciler import OrderReconciler
 from ..trading.trade_state_manager import TradeStateManager
+from ..trading.guardian_service import GuardianService
 from ..trading.universal_client import UniversalTradingClient
 from .decision_engine import TradingPair
 
@@ -52,6 +53,7 @@ class EnhancedTradeManager(PersistentComponent):
         self.position_protector: Optional[PositionProtector] = None
         self.order_reconciler: Optional[OrderReconciler] = None
         self.state_manager: Optional[TradeStateManager] = None
+        self.guardian_service: Optional[GuardianService] = None  # 🛡️ Advanced leak detection
         
         # Statistics and monitoring
         self.total_trades_processed = 0
@@ -100,6 +102,8 @@ class EnhancedTradeManager(PersistentComponent):
             self.order_reconciler.stop_reconciliation_monitoring()
         if self.state_manager:
             self.state_manager.stop_trade_management()
+        if self.guardian_service:
+            self.guardian_service.stop_guardian_monitoring()
     
     def _initialize_components(self):
         """Initialize all architecture components"""
@@ -141,6 +145,17 @@ class EnhancedTradeManager(PersistentComponent):
         }
         self.state_manager = TradeStateManager(self.current_trading_client, state_config)
         
+        # Initialize Guardian Service (High-frequency leak detection)
+        guardian_config = self.config.get("guardian_service", {
+            "guardian_scan_interval": 30,
+            "max_remediation_attempts": 3,
+            "emergency_liquidation_enabled": True,
+            "crypto_protection_enabled": True,
+            "test_order_detection": True
+        })
+        self.guardian_service = GuardianService(self.current_trading_client, guardian_config)
+        self.logger.info("🛡️  Guardian Service initialized - High-frequency leak detection enabled")
+        
         self.logger.info("✅ All components initialized")
     
     async def _start_protection_systems(self):
@@ -153,7 +168,8 @@ class EnhancedTradeManager(PersistentComponent):
                 self.bracket_manager.start_protection_monitoring(),
                 self.position_protector.start_monitoring(),
                 self.order_reconciler.start_reconciliation_monitoring(),
-                self.state_manager.start_trade_management()
+                self.state_manager.start_trade_management(),
+                self.guardian_service.start_guardian_monitoring()  # 🛡️ High-frequency protection
             )
         except Exception as e:
             self.logger.error(f"Error starting protection systems: {e}")

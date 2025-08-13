@@ -552,6 +552,18 @@ enhanced_trade_manager:
     emergency_liquidation_enabled: false  # DISABLED - prevent aggressive liquidation
     default_stop_loss_pct: 0.05     # Default 5% stop-loss
     default_take_profit_pct: 0.10   # Default 10% take-profit
+  
+  # 🛡️ Guardian Service Settings - High-frequency leak detection
+  guardian_service:
+    guardian_scan_interval: 30      # Scan every 30 seconds (high-frequency)
+    max_remediation_attempts: 3     # Up to 3 remediation attempts per leak
+    emergency_liquidation_enabled: true   # Allow emergency liquidation for critical leaks
+    crypto_protection_enabled: true       # Enable crypto position protection
+    test_order_detection: true             # Auto-detect and close test orders
+    risk_thresholds:
+      critical_value: 5000                # Critical risk above $5000
+      high_value: 1000                    # High risk above $1000
+      medium_value: 200                   # Medium risk above $200
     
   # Order Reconciler Settings
   order_reconciler:
