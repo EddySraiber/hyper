@@ -8,7 +8,7 @@ Ensures system state consistency between positions and orders.
 import asyncio
 import logging
 from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 
 from .alpaca_client import AlpacaClient
@@ -104,7 +104,7 @@ class OrderReconciler:
     async def _perform_full_reconciliation(self):
         """Perform comprehensive position-order reconciliation"""
         self.reconciliation_count += 1
-        self.last_reconciliation = datetime.utcnow()
+        self.last_reconciliation = datetime.now(timezone.utc)
         
         try:
             # Get all positions and orders
@@ -212,7 +212,7 @@ class OrderReconciler:
             issues.append(f"Multiple limit orders ({state.active_limit_orders})")
         
         # Check for stale orders
-        cutoff_time = datetime.utcnow() - timedelta(hours=self.stale_order_threshold_hours)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.stale_order_threshold_hours)
         
         for order in orders:
             if order["status"] in ["new", "accepted"]:

@@ -108,7 +108,7 @@ news_scraper:
 
 # News Filter Configuration  
 news_filter:
-  min_score: 0.1
+  min_score: 0.2
   recency_weight: 0.5
   keywords:
     - pattern: "earnings|revenue|profit"
@@ -296,7 +296,7 @@ news_impact_scorer:
 
 # Decision Engine Configuration
 decision_engine:
-  min_confidence: 0.05            # Lowered to 0.05 to enable trading for high-impact news
+  min_confidence: 0.15            # Balanced threshold: enables trading while maintaining quality
   max_position_size: 1000
   sentiment_weight: 0.4
   impact_weight: 0.4              # Increased impact weight
@@ -367,9 +367,9 @@ enhanced_trade_manager:
     
   # Position Protector Settings  
   position_protector:
-    check_interval: 300             # Increased to 5 minutes to reduce aggressive checks
-    max_protection_attempts: 2      # Reduced attempts to prevent loops
-    emergency_liquidation_enabled: false  # DISABLED - prevent aggressive liquidation of profitable positions
+    check_interval: 600             # Further increased to 10 minutes to reduce conflicts
+    max_protection_attempts: 1      # Single attempt only to prevent conflicts
+    emergency_liquidation_enabled: false  # DISABLED - prevent aggressive liquidation
     default_stop_loss_pct: 0.05     # Default 5% stop-loss
     default_take_profit_pct: 0.10   # Default 10% take-profit
     
@@ -538,6 +538,33 @@ observability:
     max_recent_trades: 20            # Maximum recent trades to display
     max_insights: 10                 # Maximum insights/recommendations to show
     enable_html_export: true         # Enable HTML dashboard export
+    
+  # Statistical Validation Framework
+  statistical_validator:
+    enabled: true                    # Enable statistical validation
+    confidence_level: 0.95           # 95% confidence level for tests
+    significance_level: 0.05         # 5% significance level
+    min_effect_size: 0.1             # 10% minimum effect size
+    risk_free_rate: 0.02             # 2% annual risk-free rate
+    trading_days_per_year: 252       # Trading days for annualization
+    min_sharpe_threshold: 1.0        # Minimum acceptable Sharpe ratio
+    max_drawdown_threshold: 0.20     # Maximum acceptable drawdown (20%)
+    min_kelly_threshold: 0.01        # Minimum Kelly fraction threshold
+    
+  # Real-time Performance Monitoring
+  performance_monitor:
+    monitoring_enabled: true         # Enable real-time monitoring
+    update_interval: 60              # Update every 60 seconds
+    rolling_window_size: 50          # Rolling window for metrics
+    risk_free_rate: 0.02             # Annual risk-free rate
+    trading_days_per_year: 252       # Trading days for annualization
+    
+    # Alert thresholds
+    alert_thresholds:
+      min_sharpe: 0.5                # Alert if Sharpe < 0.5
+      max_drawdown: 0.15             # Alert if drawdown > 15%
+      min_win_rate: 0.40             # Alert if win rate < 40%
+      consecutive_losses: 5          # Alert after 5 consecutive losses
 
 # Alpaca API Configuration
 alpaca:
