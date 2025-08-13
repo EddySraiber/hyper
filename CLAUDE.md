@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a containerized Python algorithmic trading system that analyzes financial news sentiment to make automated paper trading decisions via the Alpaca API. The system follows a modular pipeline architecture with 6 core components processing news through to trade execution.
+This is a containerized Python algorithmic trading system that analyzes financial news sentiment to make automated paper trading decisions via the Alpaca API. The system supports both **traditional stocks and cryptocurrencies** with 24/7 trading capabilities. It follows a modular pipeline architecture with 6 core components processing news through to trade execution.
 
 **SYSTEM STATUS: FULLY OPERATIONAL & PRODUCTION-SAFE** - Successfully generating and executing trades through AI-enhanced sentiment analysis, **enterprise-grade trade pairs safety architecture**, comprehensive trading cost modeling, robust testing framework with 80% news-to-price correlation accuracy, and **real-time Alpaca data synchronization** for accurate dashboard metrics. **100% position protection rate achieved** - No unprotected positions possible.
 
@@ -198,10 +198,12 @@ The system now includes **financial-specific sentiment detection** and **AI-enha
 ## Current Trading Performance
 
 **System Status**: ✅ **ACTIVELY TRADING**
+- **Asset Classes**: Traditional stocks + 60+ cryptocurrencies via Alpaca API
 - **Trade Generation**: 4 trades per processing cycle (typically every 60 seconds)
 - **Trade Types**: Both long (buy) and short (sell) positions based on sentiment
+- **Market Hours**: Stock trades (9:30 AM - 4:00 PM ET), Crypto trades (24/7)
 - **Success Rate**: Trades successfully submitted to Alpaca paper trading account
-- **Typical Symbols**: SPY, AAPL, AMZN, GM, BA (based on news mentions)
+- **Typical Symbols**: SPY, AAPL, AMZN, GM, BA + BTC/USD, ETH/USD, DOGE/USD
 
 ### Recent Optimization Results
 - **Before tuning**: 0 trades generated (sentiment too weak)
@@ -219,6 +221,7 @@ tests/
 ├── integration/             # Integration tests for component interactions
 ├── regression/              # Regression tests with baseline comparison
 ├── performance/             # Performance benchmarks
+├── crypto/                  # 🚀 Cryptocurrency integration tests (SAFE - no real trades)
 └── test_runner.py          # Centralized test runner
 ```
 
@@ -235,11 +238,15 @@ docker-compose exec algotrading-agent python tests/regression/test_regression_su
 
 # Run specific integration tests
 docker-compose exec algotrading-agent python tests/integration/test_trading_costs.py
+
+# Run crypto integration tests (SAFE - validation only)
+docker-compose exec algotrading-agent python tests/crypto/test_final_crypto_integration.py
 ```
 
 ### Test Coverage
 - **Unit Tests**: TradingCostCalculator component (11 test cases)
 - **Integration Tests**: AI integration, news processing, correlation analysis, trading costs
+- **Crypto Tests**: 🚀 Multi-asset trading validation, symbol processing, order construction (SAFE)
 - **Regression Tests**: Performance benchmarks, component stability, baseline comparison
 - **News-to-Price Correlation**: 80% accuracy validation with sentiment analysis
 
@@ -248,6 +255,12 @@ docker-compose exec algotrading-agent python tests/integration/test_trading_cost
 - **Performance monitoring**: Tracks processing speed and accuracy metrics
 - **AI fallback validation**: Tests graceful degradation when AI providers fail
 - **Commission model testing**: Validates all broker cost structures
+
+### 🛡️ Testing Safety Guidelines
+- **NO REAL TRADES**: All tests use validation-only approaches - no `submit_order()` calls
+- **Read-only operations**: Tests only validate order construction, account connectivity, and data retrieval
+- **Safe crypto testing**: Crypto tests validate symbol processing and order structures without execution
+- **Position protection**: Any test creating positions must include stop-loss/take-profit (currently disabled for safety)
 
 See `QA_TESTING_GUIDE.md` for comprehensive testing procedures including:
 - System startup and component health checks
