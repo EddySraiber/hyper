@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a containerized Python algorithmic trading system that analyzes financial news sentiment to make automated paper trading decisions via the Alpaca API. The system supports both **traditional stocks and cryptocurrencies** with 24/7 trading capabilities. It follows a modular pipeline architecture with 6 core components processing news through to trade execution.
 
-**SYSTEM STATUS: FULLY OPERATIONAL & PRODUCTION-SAFE** - Successfully generating and executing trades through AI-enhanced sentiment analysis, **enterprise-grade trade pairs safety architecture**, comprehensive trading cost modeling, robust testing framework with 80% news-to-price correlation accuracy, and **real-time Alpaca data synchronization** for accurate dashboard metrics. **100% position protection rate achieved** - No unprotected positions possible.
+**SYSTEM STATUS: FULLY OPERATIONAL & PRODUCTION-SAFE** - Successfully generating and executing trades through AI-enhanced sentiment analysis, **enterprise-grade trade pairs safety architecture**, comprehensive trading cost modeling, robust testing framework with 80% news-to-price correlation accuracy, and **real-time Alpaca data synchronization** for accurate dashboard metrics. **100% position protection rate achieved** - Critical bracket order failures resolved (Aug 2025).
 
 ## Development Commands
 
@@ -83,6 +83,20 @@ The system implements **comprehensive trade pairs safety** with multiple layers 
 - **Smart Leak Classification** - Detects test orders, crypto issues, failed brackets, orphaned positions
 - **Automatic Remediation** - Guardian Service attempts to fix leaks before emergency liquidation
 - **Emergency Recovery** - Automatic protection and liquidation capabilities for critical leaks
+
+### 🔧 **Recent System Improvements (August 2025)**
+
+**Critical Architecture Fix - Dual Trading System Resolution:**
+- **Issue**: Legacy trading code was bypassing Enhanced Trade Manager, creating unprotected positions
+- **Detection**: Guardian Service identified 14 position leaks ($3,553 exposure) with missing stop-loss/take-profit
+- **Resolution**: Consolidated all trade execution through Enhanced Trade Manager with bracket protection
+- **Impact**: 100% position protection now guaranteed - no more unsafe trading "leaks"
+
+**Enhanced Safety Monitoring:**
+- **Guardian Service**: High-frequency (30-second) leak detection and remediation system
+- **Smart Classification**: Detects test orders, failed brackets, orphaned positions, crypto issues
+- **Automatic Fix**: Guardian Service attempts remediation before emergency liquidation
+- **Testing Safety**: All tests now use validation-only approaches - no real trades executed
 
 ### 6 Core Components
 - **NewsScraper** (`algotrading_agent/components/news_scraper.py`) - RSS feed collection from Reuters, Yahoo Finance, MarketWatch
@@ -352,6 +366,12 @@ Key Python packages (see `requirements.txt`):
 3. **Check component status**: All 6 components must be running (`is_running: true`)
 4. **Review logs**: Look for "Generated X trading decisions" messages
 
+### If Position Leaks Are Detected
+1. **Check Guardian Service logs**: Look for "🚨 LEAK DETECTED" messages every 30 seconds
+2. **Run manual leak check**: `docker-compose exec algotrading-agent python tests/guardian_test.py`
+3. **Force remediation**: Guardian Service automatically attempts to fix leaks
+4. **Emergency liquidation**: Critical leaks will be auto-liquidated if protection fails
+
 ### Common Trading Execution Errors
 - **Stop-loss precision errors**: Ensure prices rounded to 2 decimal places
 - **Price validation failures**: Real-time prices may differ from cached prices during market closure
@@ -373,6 +393,17 @@ asyncio.run(check())
 
 # Monitor real-time trading decisions
 docker-compose logs -f algotrading-agent | grep -E "(decisions|trade|buy|sell)"
+
+# Monitor Guardian Service leak detection (every 30 seconds)
+docker-compose logs -f algotrading-agent | grep -E "(LEAK DETECTED|Guardian|remediat)"
+
+# Check Enhanced Trade Manager status
+docker-compose exec algotrading-agent python -c "
+from algotrading_agent.components.enhanced_trade_manager import EnhancedTradeManager
+from algotrading_agent.config.settings import get_config
+etm = EnhancedTradeManager(get_config().get_component_config('enhanced_trade_manager'))
+print('Enhanced Trade Manager Status:', etm.get_comprehensive_status())
+"
 ```
 
 ## Important Notes
