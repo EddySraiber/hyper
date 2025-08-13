@@ -534,17 +534,20 @@ class AlgotradingAgent:
             if validation["warnings"]:
                 self.logger.warning(f"Trade warnings for {pair.symbol}: {validation['warnings']}")
                 
-            # Execute the entry order (bracket order with stop-loss and take-profit)
-            price_flexibility = self.trade_manager.price_flexibility_pct
-            result = await self.alpaca_client.execute_trading_pair(pair, price_flexibility)
+            # Execute the entry order via Enhanced Trade Manager (with bracket protection)
+            result = await self.enhanced_trade_manager.execute_trade(pair)
             
             # Find the corresponding trade in the queue and update with order ID
-            for trade in self.trade_manager.active_trades.values():
-                if (trade.symbol == pair.symbol and 
-                    trade.action == pair.action and 
-                    trade.entry_target_price == pair.entry_price):
-                    trade.entry_order_id = result["order_id"]
-                    break
+            if result["success"] and result["data"]:
+                entry_order_id = result["data"].get("entry_order_id")
+                for trade in self.trade_manager.active_trades.values():
+                    if (trade.symbol == pair.symbol and 
+                        trade.action == pair.action and 
+                        trade.entry_target_price == pair.entry_price):
+                        trade.entry_order_id = entry_order_id
+                        break
+            else:
+                self.logger.error(f"Enhanced trade execution failed for {pair.symbol}: {result['message']}")
                     
             self.logger.info(f"Entry order submitted: {result}")
             
@@ -576,19 +579,21 @@ class AlgotradingAgent:
                     try:
                         self.logger.info(f"⚡ URGENT EXECUTION: {pair.symbol} {pair.action}")
                         
-                        # Use higher price flexibility for breaking news (2% instead of 1%)
-                        express_flexibility = self.trade_manager.price_flexibility_pct * 2
-                        result = await self.alpaca_client.execute_trading_pair(pair, express_flexibility)
+                        # Execute via Enhanced Trade Manager (with bracket protection)
+                        result = await self.enhanced_trade_manager.execute_trade(pair)
                         
                         # Update trade queue with order ID
-                        for trade in self.trade_manager.active_trades.values():
-                            if (trade.symbol == pair.symbol and 
-                                trade.action == pair.action and 
-                                trade.entry_target_price == pair.entry_price):
-                                trade.entry_order_id = result["order_id"]
-                                break
-                                
-                        self.logger.warning(f"✅ EXPRESS EXECUTED: {result}")
+                        if result["success"] and result["data"]:
+                            entry_order_id = result["data"].get("entry_order_id")
+                            for trade in self.trade_manager.active_trades.values():
+                                if (trade.symbol == pair.symbol and 
+                                    trade.action == pair.action and 
+                                    trade.entry_target_price == pair.entry_price):
+                                    trade.entry_order_id = entry_order_id
+                                    break
+                            self.logger.warning(f"✅ EXPRESS EXECUTED: {result['message']}")
+                        else:
+                            self.logger.error(f"Express trade execution failed for {pair.symbol}: {result['message']}")
                         
                     except Exception as e:
                         self.logger.error(f"💥 EXPRESS EXECUTION FAILED: {pair.symbol} - {e}")

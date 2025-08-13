@@ -146,7 +146,16 @@ class BracketOrderManager:
             order_result = await self.alpaca_client.execute_trading_pair(trading_pair)
             
             # Store order IDs (Alpaca bracket orders include all three orders)
-            bracket.entry_order_id = order_result["order_id"]
+            # Handle both dictionary and object response formats
+            if isinstance(order_result, dict):
+                bracket.entry_order_id = order_result.get("order_id")
+            else:
+                # Handle object response (likely from Alpaca API directly)
+                bracket.entry_order_id = getattr(order_result, 'id', str(order_result))
+            
+            if not bracket.entry_order_id:
+                raise ValueError(f"Could not extract order_id from result: {order_result}")
+            
             bracket.status = BracketOrderStatus.ACTIVE
             
             # Add to tracking
