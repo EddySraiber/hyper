@@ -43,12 +43,17 @@ class AlpacaClient:
         self.logger = logging.getLogger("algotrading.alpaca_client")
         self.logger.info(f"Initialized Alpaca client (paper_trading={self.paper_trading})")
         
-        # Supported crypto symbols on Alpaca
+        # Supported crypto symbols on Alpaca (using correct trading pair format)
         self.crypto_symbols = {
+            'BTC/USD', 'ETH/USD', 'LTC/USD', 'DOGE/USD', 'SOL/USD', 'AVAX/USD',
+            'DOT/USD', 'LINK/USD', 'SHIB/USD', 'UNI/USD', 'AAVE/USD', 'BCH/USD',
+            'CRV/USD', 'GRT/USD', 'MKR/USD', 'PEPE/USD', 'SUSHI/USD', 'XRP/USD',
+            'XTZ/USD', 'YFI/USD', 'USDC/USD', 'USDT/USD',
+            # Also include legacy format for detection
             'BTCUSD', 'ETHUSD', 'LTCUSD', 'DOGEUSD', 'SOLUSD', 'AVAXUSD', 
             'DOTUSD', 'LINKUSD', 'SHIBUSD', 'UNIUSD', 'AAVEUSD', 'BCHUSD',
             'CRVUSD', 'GRTUSD', 'MKRUSD', 'PEPEUSD', 'SUSHIUSD', 'XRPUSD', 
-            'XTZUSD', 'YFIUSD', 'USDC/USD', 'USDT/USD'
+            'XTZUSD', 'YFIUSD'
         }
     
     def _is_crypto_symbol(self, symbol: str) -> bool:
@@ -60,21 +65,34 @@ class AlpacaClient:
         return symbol in self.crypto_symbols
     
     def _normalize_crypto_symbol(self, symbol: str) -> str:
-        """Normalize crypto symbol format for Alpaca API"""
+        """Normalize crypto symbol format for Alpaca API (use trading pair format)"""
         symbol = symbol.upper()
         
-        # Common crypto symbol mappings
+        # Common crypto symbol mappings to trading pair format
         crypto_mappings = {
-            'BTC': 'BTCUSD',
-            'ETH': 'ETHUSD', 
-            'LTC': 'LTCUSD',
-            'DOGE': 'DOGEUSD',
-            'SOL': 'SOLUSD',
-            'AVAX': 'AVAXUSD',
-            'DOT': 'DOTUSD',
-            'LINK': 'LINKUSD',
-            'SHIB': 'SHIBUSD',
-            'UNI': 'UNIUSD'
+            'BTC': 'BTC/USD',
+            'ETH': 'ETH/USD', 
+            'LTC': 'LTC/USD',
+            'DOGE': 'DOGE/USD',
+            'SOL': 'SOL/USD',
+            'AVAX': 'AVAX/USD',
+            'DOT': 'DOT/USD',
+            'LINK': 'LINK/USD',
+            'SHIB': 'SHIB/USD',
+            'UNI': 'UNI/USD',
+            'AAVE': 'AAVE/USD',
+            'BCH': 'BCH/USD',
+            # Convert legacy format to trading pair format
+            'BTCUSD': 'BTC/USD',
+            'ETHUSD': 'ETH/USD',
+            'LTCUSD': 'LTC/USD',
+            'DOGEUSD': 'DOGE/USD',
+            'SOLUSD': 'SOL/USD',
+            'AVAXUSD': 'AVAX/USD',
+            'DOTUSD': 'DOT/USD',
+            'LINKUSD': 'LINK/USD',
+            'SHIBUSD': 'SHIB/USD',
+            'UNIUSD': 'UNI/USD'
         }
         
         # Return mapped symbol or original if already in correct format
@@ -225,20 +243,37 @@ class AlpacaClient:
             stop_price_rounded = round(float(pair.stop_loss), 2)
             take_profit_rounded = round(float(pair.take_profit), 2)
             
-            # Prepare the main order request (use normalized symbol for crypto)
-            order_request = MarketOrderRequest(
-                symbol=trading_symbol,
-                qty=pair.quantity,
-                side=side,
-                time_in_force=TimeInForce.DAY,
-                order_class=OrderClass.BRACKET,
-                stop_loss=StopLossRequest(
-                    stop_price=stop_price_rounded
-                ),
-                take_profit=TakeProfitRequest(
-                    limit_price=take_profit_rounded
+            # Prepare the main order request (crypto vs stock differences)
+            if is_crypto:
+                # Crypto orders: Use notional amount (minimum $10) and no bracket orders initially
+                notional_amount = pair.entry_price * pair.quantity
+                if notional_amount < 10.0:
+                    notional_amount = 10.0  # Alpaca minimum for crypto
+                    self.logger.info(f"🚀 Adjusting crypto order to minimum $10: {trading_symbol}")
+                
+                order_request = MarketOrderRequest(
+                    symbol=trading_symbol,
+                    notional=notional_amount,  # Use notional for crypto
+                    side=side,
+                    time_in_force=TimeInForce.GTC  # Crypto uses GTC, not DAY
                 )
-            )
+                self.logger.info(f"🚀 CRYPTO ORDER: {side} ${notional_amount:.2f} of {trading_symbol}")
+                
+            else:
+                # Stock orders: Use quantity and bracket orders
+                order_request = MarketOrderRequest(
+                    symbol=trading_symbol,
+                    qty=pair.quantity,
+                    side=side,
+                    time_in_force=TimeInForce.DAY,
+                    order_class=OrderClass.BRACKET,
+                    stop_loss=StopLossRequest(
+                        stop_price=stop_price_rounded
+                    ),
+                    take_profit=TakeProfitRequest(
+                        limit_price=take_profit_rounded
+                    )
+                )
             
             # Submit the order with timeout protection (15 seconds)
             order = await asyncio.wait_for(
