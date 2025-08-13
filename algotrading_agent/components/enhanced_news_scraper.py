@@ -100,6 +100,20 @@ class EnhancedNewsScraper(ComponentBase):
             )
             sources.append(source)
             
+        # Social media sources
+        social_sources = config.get("social_sources", [])
+        for source_config in social_sources:
+            source = NewsSource(
+                name=source_config["name"],
+                type="social",
+                url=source_config["url"],
+                enabled=source_config.get("enabled", True),
+                priority=source_config.get("priority", 2),
+                rate_limit=source_config.get("rate_limit", 60.0),
+                headers=source_config.get("headers", {})
+            )
+            sources.append(source)
+            
         # WebSocket streaming sources  
         ws_sources = config.get("websocket_sources", [])
         for source_config in ws_sources:
@@ -200,7 +214,7 @@ class EnhancedNewsScraper(ComponentBase):
             async with semaphore:
                 return await self._scrape_source_with_retry(source)
         
-        # Gather results from all sources
+        # Gather results from all sources (RSS, API, Social)
         tasks = [scrape_source_safe(source) for source in active_sources]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
@@ -365,6 +379,8 @@ class EnhancedNewsScraper(ComponentBase):
                     return await self._scrape_rss_enhanced(source)
                 elif source.type == "api":
                     return await self._scrape_api_enhanced(source)
+                elif source.type == "social":
+                    return await self._scrape_social_enhanced(source)
                 else:
                     self.logger.warning(f"Unknown source type: {source.type}")
                     return []
@@ -521,6 +537,57 @@ class EnhancedNewsScraper(ComponentBase):
                         "raw_data": item
                     }
                     articles.append(article)
+            
+            elif "newsapi" in source.name.lower():
+                # News API format
+                articles_data = data.get("articles", [])
+                for item in articles_data:
+                    published_date = self._parse_date(item.get("publishedAt", ""))
+                    article = {
+                        "title": item.get("title", ""),
+                        "content": item.get("description", ""),
+                        "url": item.get("url", ""),
+                        "published": published_date,
+                        "source": source.name,
+                        "author": item.get("author", ""),
+                        "image": item.get("urlToImage", ""),
+                        "raw_data": item
+                    }
+                    articles.append(article)
+                    
+            elif "polygon" in source.name.lower():
+                # Polygon.io News API format
+                results = data.get("results", [])
+                for item in results:
+                    published_date = self._parse_date(item.get("published_utc", ""))
+                    article = {
+                        "title": item.get("title", ""),
+                        "content": item.get("description", ""),
+                        "url": item.get("article_url", ""),
+                        "published": published_date,
+                        "source": source.name,
+                        "author": item.get("author", ""),
+                        "tickers": item.get("tickers", []),
+                        "raw_data": item
+                    }
+                    articles.append(article)
+                    
+            elif "fred" in source.name.lower():
+                # Federal Reserve Economic Data API format
+                releases = data.get("releases", [])
+                for item in releases:
+                    published_date = self._parse_date(item.get("realtime_start", ""))
+                    article = {
+                        "title": f"Economic Release: {item.get('name', '')}",
+                        "content": f"FRED Release ID: {item.get('id', '')}, Press Release: {item.get('press_release', 'Available')}",
+                        "url": item.get("link", ""),
+                        "published": published_date,
+                        "source": source.name,
+                        "category": "economic_data",
+                        "fred_id": item.get("id", ""),
+                        "raw_data": item
+                    }
+                    articles.append(article)
             else:
                 # Generic API format
                 self.logger.warning(f"Unknown API format for {source.name}")
@@ -529,6 +596,201 @@ class EnhancedNewsScraper(ComponentBase):
             self.logger.error(f"Error parsing API response from {source.name}: {e}")
             
         return articles
+    
+    async def _scrape_social_enhanced(self, source: NewsSource) -> List[Dict[str, Any]]:
+        """Enhanced social media scraping for Reddit and Twitter"""
+        try:
+            if "reddit" in source.name.lower():
+                return await self._scrape_reddit(source)
+            elif "twitter" in source.name.lower():
+                return await self._scrape_twitter(source)
+            else:
+                self.logger.warning(f"Unknown social source type: {source.name}")
+                return []
+                
+        except Exception as e:
+            self.logger.error(f"Social scraping error for {source.name}: {e}")
+            raise
+    
+    async def _scrape_reddit(self, source: NewsSource) -> List[Dict[str, Any]]:
+        """Scrape Reddit posts for financial sentiment"""
+        try:
+            headers = source.headers.copy() if source.headers else {}
+            headers.update({
+                'Accept': 'application/json',
+                'User-Agent': headers.get('User-Agent', 'AlgoTradingAgent/1.0')
+            })
+            
+            async with self.session.get(source.url, headers=headers) as response:
+                if response.status != 200:
+                    raise aiohttp.ClientResponseError(
+                        request_info=response.request_info,
+                        history=response.history,
+                        status=response.status
+                    )
+                
+                data = await response.json()
+                posts_data = data.get("data", {}).get("children", [])
+                articles = []
+                
+                cutoff_time = datetime.utcnow() - timedelta(minutes=self.max_age_minutes)
+                
+                for post_data in posts_data:
+                    post = post_data.get("data", {})
+                    
+                    # Skip if not relevant or too old
+                    created_utc = post.get("created_utc", 0)
+                    created_date = datetime.fromtimestamp(created_utc) if created_utc else datetime.utcnow()
+                    
+                    if created_date < cutoff_time:
+                        continue
+                    
+                    # Extract financial relevance
+                    title = post.get("title", "")
+                    content = post.get("selftext", "")
+                    
+                    # Basic filter for financial relevance
+                    financial_keywords = [
+                        'stock', 'stocks', 'trading', 'buy', 'sell', 'call', 'put', 
+                        'earnings', 'dividend', 'market', 'bull', 'bear', 'DD',
+                        'YOLO', 'diamond hands', 'paper hands', 'to the moon'
+                    ]
+                    
+                    combined_text = f"{title} {content}".lower()
+                    if not any(keyword in combined_text for keyword in financial_keywords):
+                        continue
+                    
+                    # Check for stock ticker mentions ($SYMBOL or SYMBOL pattern)
+                    import re
+                    tickers = re.findall(r'\$([A-Z]{1,5})\b|\b([A-Z]{2,5})\b', combined_text.upper())
+                    ticker_mentions = [t[0] if t[0] else t[1] for t in tickers if t[0] or t[1]]
+                    
+                    article = {
+                        "title": title,
+                        "content": content[:500] + "..." if len(content) > 500 else content,
+                        "url": f"https://reddit.com{post.get('permalink', '')}",
+                        "published": created_date,
+                        "source": source.name,
+                        "upvotes": post.get("ups", 0),
+                        "downvotes": post.get("downs", 0),
+                        "score": post.get("score", 0),
+                        "num_comments": post.get("num_comments", 0),
+                        "subreddit": post.get("subreddit", ""),
+                        "author": post.get("author", ""),
+                        "tickers": ticker_mentions,
+                        "social_metrics": {
+                            "engagement_score": post.get("score", 0) + post.get("num_comments", 0),
+                            "upvote_ratio": post.get("upvote_ratio", 0),
+                            "controversiality": post.get("controversiality", 0)
+                        },
+                        "raw_data": post
+                    }
+                    
+                    # Add basic sentiment using VADER (if available)
+                    try:
+                        from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+                        analyzer = SentimentIntensityAnalyzer()
+                        sentiment = analyzer.polarity_scores(combined_text)
+                        article["sentiment"] = sentiment["compound"]  # Overall sentiment score
+                        article["sentiment_detail"] = sentiment
+                    except ImportError:
+                        article["sentiment"] = 0.0  # Neutral if VADER not available
+                    
+                    articles.append(article)
+                
+                source.failure_count = 0  # Reset failure count on success
+                return articles[:25]  # Limit to 25 most recent relevant posts
+                
+        except Exception as e:
+            self.logger.error(f"Reddit scraping error for {source.name}: {e}")
+            raise
+    
+    async def _scrape_twitter(self, source: NewsSource) -> List[Dict[str, Any]]:
+        """Scrape Twitter for financial sentiment (requires API key)"""
+        try:
+            # Twitter API v2 implementation (simplified)
+            headers = source.headers.copy() if source.headers else {}
+            
+            # Add API key if configured
+            if source.api_key_env:
+                import os
+                api_key = os.getenv(source.api_key_env)
+                if api_key:
+                    headers["Authorization"] = f"Bearer {api_key}"
+                else:
+                    self.logger.warning(f"Twitter API key not found for {source.name}")
+                    return []
+            else:
+                self.logger.warning(f"No API key configured for {source.name}")
+                return []
+            
+            async with self.session.get(source.url, headers=headers) as response:
+                if response.status != 200:
+                    raise aiohttp.ClientResponseError(
+                        request_info=response.request_info,
+                        history=response.history,
+                        status=response.status
+                    )
+                
+                data = await response.json()
+                tweets = data.get("data", [])
+                articles = []
+                
+                cutoff_time = datetime.utcnow() - timedelta(minutes=self.max_age_minutes)
+                
+                for tweet in tweets:
+                    created_date = self._parse_date(tweet.get("created_at", ""))
+                    
+                    if created_date < cutoff_time:
+                        continue
+                    
+                    text = tweet.get("text", "")
+                    
+                    # Extract financial relevance and tickers
+                    import re
+                    tickers = re.findall(r'\$([A-Z]{1,5})\b', text.upper())
+                    
+                    if not tickers:  # Skip tweets without stock mentions
+                        continue
+                    
+                    # Get public metrics if available
+                    public_metrics = tweet.get("public_metrics", {})
+                    
+                    article = {
+                        "title": text[:100] + "..." if len(text) > 100 else text,
+                        "content": text,
+                        "url": f"https://twitter.com/i/web/status/{tweet.get('id', '')}",
+                        "published": created_date,
+                        "source": source.name,
+                        "author": tweet.get("author_id", ""),
+                        "tickers": tickers,
+                        "social_metrics": {
+                            "retweets": public_metrics.get("retweet_count", 0),
+                            "likes": public_metrics.get("like_count", 0),
+                            "replies": public_metrics.get("reply_count", 0),
+                            "quotes": public_metrics.get("quote_count", 0)
+                        },
+                        "raw_data": tweet
+                    }
+                    
+                    # Add basic sentiment using VADER (if available)
+                    try:
+                        from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+                        analyzer = SentimentIntensityAnalyzer()
+                        sentiment = analyzer.polarity_scores(text)
+                        article["sentiment"] = sentiment["compound"]
+                        article["sentiment_detail"] = sentiment
+                    except ImportError:
+                        article["sentiment"] = 0.0
+                    
+                    articles.append(article)
+                
+                source.failure_count = 0  # Reset failure count on success
+                return articles
+                
+        except Exception as e:
+            self.logger.error(f"Twitter scraping error for {source.name}: {e}")
+            raise
     
     async def _extract_full_content(self, url: str) -> Optional[str]:
         """Extract full article content from URL"""

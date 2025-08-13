@@ -27,5 +27,21 @@ beautifulsoup4==4.12.2  # HTML parsing for full article extraction
 lxml==4.9.3             # Fast XML/HTML parser
 websockets>=10.2,<11.0  # WebSocket client for real-time feeds (compatible with alpaca-py)
 
+# Social Media Sentiment Analysis
+praw==7.7.1             # Python Reddit API Wrapper
+vaderSentiment==3.3.2   # VADER sentiment analyzer for social media
+
+# Economic Data Sources  
+fredapi==0.4.3          # Federal Reserve Economic Data API
+pandas>=2.0.0,<3.0.0    # Data manipulation and analysis (compatible with alpaca-py)
+
+# Text Processing and NLP Enhancement
+nltk==3.8.1            # Natural Language Toolkit
+fuzzywuzzy==0.18.0      # Fuzzy string matching for deduplication
+chardet==5.2.0          # Character encoding detection
+
+# Additional Data Processing
+redis==5.0.1            # Redis client for caching (optional)
+
 # Twitter API Integration (for social sentiment)
 # Note: Uses aiohttp and requests already included above

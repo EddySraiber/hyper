@@ -12,11 +12,15 @@ enhanced_news_scraper:
   enabled: true               # Enable enhanced scraper (fallback to legacy if fails)
   update_interval: 45         # 45 seconds for enhanced scraping
   max_age_minutes: 30         # Only process news from last 30 minutes
-  max_concurrent_requests: 10 # Concurrent scraping limit
+  max_concurrent_requests: 15 # Increased concurrent scraping limit
   enable_full_content: true   # Extract full articles beyond RSS summaries
   enable_deduplication: true  # Remove duplicate articles
+  enable_social_sentiment: true # Process social media sentiment data
+  enable_economic_data: true  # Include economic indicators and data
   retry_failed_sources: true  # Retry failed sources
   max_failures_before_disable: 5  # Disable source after consecutive failures
+  content_quality_threshold: 0.3  # Minimum quality score for articles
+  social_sentiment_weight: 0.4    # Weight for social sentiment in final score
   
   # Legacy RSS Sources (existing)
   sources:
@@ -54,20 +58,74 @@ enhanced_news_scraper:
       priority: 1
       rate_limit: 5.0  # 5 seconds between requests (free tier limit)
       api_key_env: "ALPHA_VANTAGE_API_KEY"
-    - name: "Finnhub Market News"
-      type: "api" 
-      url: "https://finnhub.io/api/v1/news?category=general"
-      enabled: false  # Disabled until API key configured
+    
+    - name: "Finnhub Company News"
+      type: "api"
+      url: "https://finnhub.io/api/v1/company-news?symbol=AAPL&from=2024-01-01&to=2025-12-31"
+      enabled: false
       priority: 1
       rate_limit: 1.0
       api_key_env: "FINNHUB_API_KEY"
+    
+    - name: "News API Business"
+      type: "api"
+      url: "https://newsapi.org/v2/top-headlines?category=business&country=us&pageSize=50"
+      enabled: false
+      priority: 2
+      rate_limit: 3600.0  # 1 hour for free tier
+      api_key_env: "NEWS_API_KEY"
+    
+    - name: "Polygon.io Market News"
+      type: "api"
+      url: "https://api.polygon.io/v2/reference/news?limit=50&order=desc&sort=published_utc"
+      enabled: false
+      priority: 1
+      rate_limit: 60.0  # 1 per minute for basic tier
+      api_key_env: "POLYGON_API_KEY"
+    
     - name: "IEX Cloud News"
       type: "api"
       url: "https://cloud.iexapis.com/stable/news/last/50"
-      enabled: false  # Disabled until API key configured  
+      enabled: false  # Disabled until API key configured
       priority: 2
       rate_limit: 1.0
       api_key_env: "IEX_CLOUD_API_KEY"
+    
+    - name: "Federal Reserve Economic Data"
+      type: "api"
+      url: "https://api.stlouisfed.org/fred/releases?api_key=YOUR_API_KEY&file_type=json&limit=10"
+      enabled: false
+      priority: 3
+      rate_limit: 60.0
+      api_key_env: "FRED_API_KEY"
+  
+  # Social sentiment and alternative data sources
+  social_sources:
+    - name: "Reddit WSB Sentiment"
+      type: "social"
+      url: "https://www.reddit.com/r/wallstreetbets/top.json?limit=25&t=hour"
+      enabled: true
+      priority: 2
+      rate_limit: 60.0
+      headers:
+        "User-Agent": "AlgoTradingAgent/1.0 Financial Sentiment Analysis"
+    
+    - name: "Reddit Investing Sentiment"
+      type: "social"
+      url: "https://www.reddit.com/r/investing/top.json?limit=25&t=hour"
+      enabled: true
+      priority: 2
+      rate_limit: 60.0
+      headers:
+        "User-Agent": "AlgoTradingAgent/1.0 Financial Sentiment Analysis"
+    
+    - name: "Twitter Financial Hashtags"
+      type: "social"
+      url: "https://api.twitter.com/2/tweets/search/recent?query=%23stocks OR %23trading OR %23markets OR %23finance&max_results=100"
+      enabled: false  # Requires Twitter API v2 Bearer Token
+      priority: 2
+      rate_limit: 900.0  # 15 minutes
+      api_key_env: "TWITTER_BEARER_TOKEN"
   
   # WebSocket Real-time Sources (future enhancement)
   websocket_sources:
@@ -76,11 +134,18 @@ enhanced_news_scraper:
       url: "wss://ws.finnhub.io"
       enabled: false  # Disabled until API key configured
       api_key_env: "FINNHUB_API_KEY"
-    - name: "Alpha Vantage WebSocket"
-      type: "websocket" 
-      url: "wss://ws.alphavantage.co"
-      enabled: false  # Not available in free tier
-      api_key_env: "ALPHA_VANTAGE_API_KEY"
+    
+    - name: "Alpaca Data WebSocket"
+      type: "websocket"
+      url: "wss://stream.data.alpaca.markets/v2/news"
+      enabled: false
+      api_key_env: "ALPACA_API_KEY"
+    
+    - name: "Polygon.io WebSocket"
+      type: "websocket"
+      url: "wss://socket.polygon.io/news"
+      enabled: false
+      api_key_env: "POLYGON_API_KEY"
 
 # Legacy News Scraper Configuration (for backward compatibility)
 news_scraper:
