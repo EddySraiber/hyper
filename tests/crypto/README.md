@@ -11,7 +11,7 @@ This directory contains comprehensive tests for the crypto trading functionality
 
 ### Component-Specific Tests  
 - **`test_decision_engine.py`** - Decision engine crypto symbol processing and sentiment analysis
-- **`test_crypto_order.py`** - Direct crypto order placement testing via Alpaca API
+- **`test_crypto_order.py`** - ⚠️ SAFE crypto order validation (NO REAL TRADES EXECUTED)
 
 ### Utility Scripts
 - **`check_crypto_positions.py`** - Check current crypto positions and order status
@@ -24,7 +24,7 @@ This directory contains comprehensive tests for the crypto trading functionality
 # Run comprehensive crypto integration test
 docker-compose exec algotrading-agent python /app/tests/crypto/test_final_crypto_integration.py
 
-# Test crypto order placement  
+# Test crypto order validation (SAFE - no real trades)
 docker-compose exec algotrading-agent python /app/tests/crypto/test_crypto_order.py
 
 # Check current crypto positions

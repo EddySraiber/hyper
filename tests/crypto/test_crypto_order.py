@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test placing a crypto order directly via Alpaca
+SAFE crypto order validation test - NO REAL TRADES EXECUTED
 """
 import asyncio
 import sys
@@ -11,84 +11,100 @@ from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
 import os
 
-async def test_crypto_order():
-    print('🚀 TESTING CRYPTO ORDER PLACEMENT')
-    print('=' * 40)
+async def test_crypto_order_validation():
+    print('🛡️  SAFE CRYPTO ORDER VALIDATION TEST')
+    print('⚠️  NO REAL TRADES WILL BE EXECUTED')
+    print('=' * 50)
     
     api_key = os.getenv('ALPACA_API_KEY')
     secret_key = os.getenv('ALPACA_SECRET_KEY')
     
     trading_client = TradingClient(api_key, secret_key, paper=True)
     
-    # Try to place a small DOGE order (found earlier)
-    print('💰 Attempting to place small DOGE order...')
+    # Test 1: Validate crypto order construction (NO SUBMISSION)
+    print('🔧 Test 1: Crypto Order Construction')
     
     try:
-        order_request = MarketOrderRequest(
+        # Test quantity-based order (this should fail for crypto)
+        qty_order = MarketOrderRequest(
             symbol='DOGE/USD',
-            qty=1,  # Buy 1 DOGE
+            qty=1,
             side=OrderSide.BUY,
             time_in_force=TimeInForce.GTC
         )
         
-        print(f'   Order details: BUY 1 DOGE/USD at MARKET')
+        print(f'   ✅ Quantity order created: BUY 1 DOGE/USD')
+        print(f'   Symbol: {qty_order.symbol}')
+        print(f'   Quantity: {qty_order.qty}')
+        print(f'   Side: {qty_order.side}')
         
-        order = trading_client.submit_order(order_request)
+        # Test notional-based order (correct for crypto)
+        notional_order = MarketOrderRequest(
+            symbol='DOGE/USD',
+            notional=10.0,
+            side=OrderSide.BUY,
+            time_in_force=TimeInForce.GTC
+        )
         
-        print(f'   ✅ ORDER SUBMITTED!')
-        print(f'   Order ID: {order.id}')
-        print(f'   Status: {order.status}')
-        print(f'   Symbol: {order.symbol}')
-        print(f'   Quantity: {order.qty}')
-        
-        # Wait a moment and check order status
-        await asyncio.sleep(2)
-        
-        updated_order = trading_client.get_order_by_id(order.id)
-        print(f'   Updated Status: {updated_order.status}')
-        
-        if hasattr(updated_order, 'filled_avg_price') and updated_order.filled_avg_price:
-            print(f'   Filled Price: ${updated_order.filled_avg_price}')
-            print('   🎉 CRYPTO ORDER EXECUTED SUCCESSFULLY!')
-        
-        return True
+        print(f'   ✅ Notional order created: BUY $10 of DOGE/USD')
+        print(f'   Symbol: {notional_order.symbol}')
+        print(f'   Notional: ${notional_order.notional}')
+        print(f'   Side: {notional_order.side}')
         
     except Exception as e:
-        print(f'   ❌ ORDER FAILED: {e}')
+        print(f'   ❌ Order construction failed: {e}')
+        return False
         
-        # Try with notional amount instead
-        print()
-        print('💡 Trying notional order (buy $10 worth)...')
-        try:
-            order_request = MarketOrderRequest(
-                symbol='DOGE/USD',
-                notional=10,  # Buy $10 worth of DOGE
-                side=OrderSide.BUY,
-                time_in_force=TimeInForce.GTC
-            )
+    # Test 2: Check crypto assets availability (READ-ONLY)
+    print()
+    print('🔍 Test 2: Crypto Assets Availability Check')
+    
+    try:
+        # Get account info (read-only)
+        account = trading_client.get_account()
+        print(f'   ✅ Account connected: ${account.portfolio_value}')
+        
+        # Check tradable assets (read-only)
+        assets = trading_client.get_all_assets()
+        crypto_assets = [asset for asset in assets if '/' in asset.symbol and 'USD' in asset.symbol]
+        
+        print(f'   ✅ Found {len(crypto_assets)} crypto trading pairs')
+        
+        # Show first few crypto assets
+        for asset in crypto_assets[:5]:
+            print(f'      {asset.symbol}: {asset.status}')
             
-            order = trading_client.submit_order(order_request)
-            print(f'   ✅ NOTIONAL ORDER SUBMITTED!')
-            print(f'   Order ID: {order.id}')
-            print(f'   Status: {order.status}')
+    except Exception as e:
+        print(f'   ❌ Asset check failed: {e}')
+        return False
+        
+    # Test 3: Current positions check (READ-ONLY)
+    print()
+    print('🔍 Test 3: Current Positions Check (Read-Only)')
+    
+    try:
+        positions = trading_client.get_all_positions()
+        crypto_positions = [pos for pos in positions if '/' in pos.symbol]
+        
+        if crypto_positions:
+            print(f'   ⚠️  Found {len(crypto_positions)} existing crypto positions:')
+            for pos in crypto_positions:
+                print(f'      {pos.symbol}: {pos.qty} shares (P&L: ${pos.unrealized_pl})')
+        else:
+            print('   ✅ No existing crypto positions found')
             
-            return True
-            
-        except Exception as e2:
-            print(f'   ❌ NOTIONAL ORDER FAILED: {e2}')
-            
-            # Check current positions to see what we have
-            print()
-            print('📊 Current positions:')
-            try:
-                positions = trading_client.get_all_positions()
-                for pos in positions:
-                    print(f'   {pos.symbol}: {pos.qty} shares')
-            except Exception as e3:
-                print(f'   ❌ Position check failed: {e3}')
-            
-            return False
+    except Exception as e:
+        print(f'   ❌ Position check failed: {e}')
+        return False
+        
+    print()
+    print('🎉 SAFE VALIDATION COMPLETE!')
+    print('✅ All crypto order structures validated')
+    print('✅ No real trades were executed')
+    print('✅ Account and asset data retrieved successfully')
+    
+    return True
 
 if __name__ == "__main__":
-    success = asyncio.run(test_crypto_order())
+    success = asyncio.run(test_crypto_order_validation())
     exit(0 if success else 1)
