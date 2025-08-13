@@ -38,6 +38,9 @@ docker-compose exec algotrading-agent python analysis/emergency_scripts/emergenc
 
 # Test Guardian Service (high-frequency leak detection)
 docker-compose exec algotrading-agent python tests/guardian_test.py
+
+# Verify system architecture and safety fixes (post-restart validation)
+docker-compose exec algotrading-agent python tests/verify_fix.py
 ```
 
 ### Optional Services
@@ -97,6 +100,13 @@ The system implements **comprehensive trade pairs safety** with multiple layers 
 - **Smart Classification**: Detects test orders, failed brackets, orphaned positions, crypto issues
 - **Automatic Fix**: Guardian Service attempts remediation before emergency liquidation
 - **Testing Safety**: All tests now use validation-only approaches - no real trades executed
+
+**System Reliability Validation:**
+- **Fix Verification**: Comprehensive testing confirms architectural improvements are working
+- **Multi-Layer Protection**: Enhanced Trade Manager + Guardian Service + Position Protector all active
+- **Error Resilience**: Improved bracket order parsing handles API response variations gracefully
+- **Zero Bypass Paths**: All legacy direct trading paths eliminated and validated
+- **Live Monitoring**: Real-time confirmation that new trades route through protected architecture
 
 ### 6 Core Components
 - **NewsScraper** (`algotrading_agent/components/news_scraper.py`) - RSS feed collection from Reuters, Yahoo Finance, MarketWatch
@@ -282,6 +292,33 @@ docker-compose exec algotrading-agent python tests/crypto/test_final_crypto_inte
 - **Safe crypto testing**: Crypto tests validate symbol processing and order structures without execution
 - **Position protection**: Any test creating positions must include stop-loss/take-profit (currently disabled for safety)
 
+### 🔍 System Reliability Verification
+After any system restart or significant changes, verify the architecture is working correctly:
+
+```bash
+# 1. Confirm Enhanced Trade Manager is active
+docker-compose logs algotrading-agent | grep "Enhanced Trade Manager.*started"
+
+# 2. Verify Guardian Service is monitoring
+docker-compose logs algotrading-agent | grep "Guardian Service.*Advanced Position Safety Monitor"
+
+# 3. Check for any position leaks detected
+docker-compose logs algotrading-agent | grep "LEAK DETECTED" | tail -5
+
+# 4. Validate bracket order system is functional
+docker-compose logs algotrading-agent | grep "bracket order" | tail -5
+
+# 5. Run comprehensive architecture validation
+docker-compose exec algotrading-agent python tests/verify_fix.py
+```
+
+**Expected Results:**
+- ✅ Enhanced Trade Manager: Started successfully
+- ✅ Guardian Service: Active with 30-second monitoring
+- ✅ Bracket Order Manager: Protection monitoring active  
+- ✅ No new position leaks (only existing pre-fix positions may show)
+- ✅ All safety layers operational
+
 See `QA_TESTING_GUIDE.md` for comprehensive testing procedures including:
 - System startup and component health checks
 - Data flow validation through all 6 components
@@ -371,6 +408,13 @@ Key Python packages (see `requirements.txt`):
 2. **Run manual leak check**: `docker-compose exec algotrading-agent python tests/guardian_test.py`
 3. **Force remediation**: Guardian Service automatically attempts to fix leaks
 4. **Emergency liquidation**: Critical leaks will be auto-liquidated if protection fails
+
+### If Safety Validation Fails After Restart
+1. **Enhanced Trade Manager missing**: Check logs for startup errors in `enhanced_trade_manager` component
+2. **Guardian Service not active**: Verify `guardian_service` configuration in `config/default.yml`
+3. **Bracket orders failing**: Check Alpaca API connectivity and response format changes
+4. **Legacy bypass detected**: Search codebase for any remaining direct `alpaca_client.execute_trading_pair()` calls
+5. **Protection layers offline**: Restart system with `docker-compose down && docker-compose up -d --build`
 
 ### Common Trading Execution Errors
 - **Stop-loss precision errors**: Ensure prices rounded to 2 decimal places
