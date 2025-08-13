@@ -379,7 +379,13 @@ class NewsAnalysisBrain(ComponentBase):
                 "palantir": "PLTR", "coinbase": "COIN", "uber": "UBER", "airbnb": "ABNB", "zoom": "ZM",
                 "slack": "CRM", "snowflake": "SNOW", "databricks": "DBRX", "openai": "NVDA",
                 "beyond": "BBBY", "bed bath": "BBBY", "charter": "CHTR", "liberty": "LBRDA",
-                "cadillac": "GM", "vistiq": "GM", "buy buy baby": "BBBY", "broadband": "CHTR"
+                "cadillac": "GM", "vistiq": "GM", "buy buy baby": "BBBY", "broadband": "CHTR",
+                # Recent high-impact news companies
+                "bullish": "COIN", "cardinal health": "CAH", "cardinal": "CAH", "cava": "CAVA",
+                "cpchemicals": "DOW", "cpche": "DOW", "velocity financial": "VEL", "velocity": "VEL",
+                "artemis gold": "ARTG", "artemis": "ARTG", "innovative food": "IVH", "innovative": "IVH",
+                "allegion": "ALLE", "medexus": "MDXS", "dream unlimited": "DRM", "dream": "DRM",
+                "exxon mobil": "XOM", "schwab": "SCHW", "charles schwab": "SCHW"
             }
             
             # Only extract explicitly mentioned stock tickers with $ prefix
