@@ -108,7 +108,7 @@ news_scraper:
 
 # News Filter Configuration  
 news_filter:
-  min_score: 0.3
+  min_score: 0.1
   recency_weight: 0.5
   keywords:
     - pattern: "earnings|revenue|profit"
@@ -296,7 +296,7 @@ news_impact_scorer:
 
 # Decision Engine Configuration
 decision_engine:
-  min_confidence: 0.30            # Increased to 0.30 to improve signal quality and reduce noise trades
+  min_confidence: 0.05            # Lowered to 0.05 to enable trading for high-impact news
   max_position_size: 1000
   sentiment_weight: 0.4
   impact_weight: 0.4              # Increased impact weight
