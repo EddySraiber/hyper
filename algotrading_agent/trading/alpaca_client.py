@@ -4,9 +4,9 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest, StopLossRequest, TakeProfitRequest
-from alpaca.trading.enums import OrderSide, TimeInForce, OrderClass
-from alpaca.data import StockHistoricalDataClient
-from alpaca.data.requests import StockLatestQuoteRequest
+from alpaca.trading.enums import OrderSide, TimeInForce, OrderClass, AssetClass
+from alpaca.data import StockHistoricalDataClient, CryptoHistoricalDataClient
+from alpaca.data.requests import StockLatestQuoteRequest, CryptoLatestQuoteRequest
 from alpaca.common.exceptions import APIError
 
 from ..components.decision_engine import TradingPair
@@ -34,8 +34,51 @@ class AlpacaClient:
             secret_key=self.secret_key
         )
         
+        # Initialize crypto data client for crypto trading
+        self.crypto_data_client = CryptoHistoricalDataClient(
+            api_key=self.api_key,
+            secret_key=self.secret_key
+        )
+        
         self.logger = logging.getLogger("algotrading.alpaca_client")
         self.logger.info(f"Initialized Alpaca client (paper_trading={self.paper_trading})")
+        
+        # Supported crypto symbols on Alpaca
+        self.crypto_symbols = {
+            'BTCUSD', 'ETHUSD', 'LTCUSD', 'DOGEUSD', 'SOLUSD', 'AVAXUSD', 
+            'DOTUSD', 'LINKUSD', 'SHIBUSD', 'UNIUSD', 'AAVEUSD', 'BCHUSD',
+            'CRVUSD', 'GRTUSD', 'MKRUSD', 'PEPEUSD', 'SUSHIUSD', 'XRPUSD', 
+            'XTZUSD', 'YFIUSD', 'USDC/USD', 'USDT/USD'
+        }
+    
+    def _is_crypto_symbol(self, symbol: str) -> bool:
+        """Check if a symbol is a crypto asset"""
+        # Normalize symbol format
+        symbol = symbol.upper().replace('/', '')
+        
+        # Check against known crypto symbols
+        return symbol in self.crypto_symbols
+    
+    def _normalize_crypto_symbol(self, symbol: str) -> str:
+        """Normalize crypto symbol format for Alpaca API"""
+        symbol = symbol.upper()
+        
+        # Common crypto symbol mappings
+        crypto_mappings = {
+            'BTC': 'BTCUSD',
+            'ETH': 'ETHUSD', 
+            'LTC': 'LTCUSD',
+            'DOGE': 'DOGEUSD',
+            'SOL': 'SOLUSD',
+            'AVAX': 'AVAXUSD',
+            'DOT': 'DOTUSD',
+            'LINK': 'LINKUSD',
+            'SHIB': 'SHIBUSD',
+            'UNI': 'UNIUSD'
+        }
+        
+        # Return mapped symbol or original if already in correct format
+        return crypto_mappings.get(symbol, symbol)
         
     async def get_account_info(self) -> Dict[str, Any]:
         """Get account information"""
@@ -76,40 +119,70 @@ class AlpacaClient:
             return []
             
     async def get_current_price(self, symbol: str) -> Optional[float]:
-        """Get current price for a symbol with timeout protection"""
+        """Get current price for a symbol (stocks or crypto) with timeout protection"""
         try:
-            request = StockLatestQuoteRequest(symbol_or_symbols=[symbol])
+            # Normalize symbol and check if it's crypto
+            normalized_symbol = self._normalize_crypto_symbol(symbol)
+            is_crypto = self._is_crypto_symbol(normalized_symbol)
             
-            # Wrap synchronous API call with timeout protection (10 seconds)
-            quotes = await asyncio.wait_for(
-                asyncio.get_event_loop().run_in_executor(
-                    None, self.data_client.get_stock_latest_quote, request
-                ), timeout=10.0
-            )
-            
-            if symbol in quotes:
-                quote = quotes[symbol]
-                # Use mid price (average of bid and ask)
-                return (float(quote.bid_price) + float(quote.ask_price)) / 2
+            if is_crypto:
+                # Use crypto data client for crypto symbols
+                request = CryptoLatestQuoteRequest(symbol_or_symbols=[normalized_symbol])
+                
+                quotes = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None, self.crypto_data_client.get_crypto_latest_quote, request
+                    ), timeout=10.0
+                )
+                
+                if normalized_symbol in quotes:
+                    quote = quotes[normalized_symbol]
+                    # Use mid price (average of bid and ask)
+                    return (float(quote.bid_price) + float(quote.ask_price)) / 2
+            else:
+                # Use stock data client for stock symbols
+                request = StockLatestQuoteRequest(symbol_or_symbols=[symbol])
+                
+                quotes = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None, self.data_client.get_stock_latest_quote, request
+                    ), timeout=10.0
+                )
+                
+                if symbol in quotes:
+                    quote = quotes[symbol]
+                    # Use mid price (average of bid and ask)
+                    return (float(quote.bid_price) + float(quote.ask_price)) / 2
+                    
             return None
             
         except asyncio.TimeoutError:
-            self.logger.warning(f"Timeout getting price for {symbol} - market may be closed")
+            asset_type = "crypto" if self._is_crypto_symbol(symbol) else "stock"
+            self.logger.warning(f"Timeout getting {asset_type} price for {symbol} - market may be closed")
             return None
         except Exception as e:
-            self.logger.error(f"Error getting price for {symbol}: {e}")
+            asset_type = "crypto" if self._is_crypto_symbol(symbol) else "stock"  
+            self.logger.error(f"Error getting {asset_type} price for {symbol}: {e}")
             return None
             
     async def execute_trading_pair(self, pair: TradingPair, price_flexibility_pct: float = 0.01) -> Dict[str, Any]:
-        """Execute a trading pair with price flexibility check"""
+        """Execute a trading pair (stocks or crypto) with price flexibility check"""
         try:
+            # Normalize symbol for crypto
+            trading_symbol = self._normalize_crypto_symbol(pair.symbol)
+            is_crypto = self._is_crypto_symbol(trading_symbol)
+            
             # Get current price to validate and check flexibility bounds
-            current_price = await self.get_current_price(pair.symbol)
+            current_price = await self.get_current_price(trading_symbol)
             if not current_price:
-                raise ValueError(f"Could not get current price for {pair.symbol}")
+                raise ValueError(f"Could not get current price for {trading_symbol}")
             
             # Check if current price is acceptable (embrace better prices, reject worse ones)
             target_price = pair.entry_price
+            
+            # Log asset type for debugging
+            asset_type = "crypto" if is_crypto else "stock"
+            self.logger.info(f"Executing {asset_type} trading pair: {trading_symbol}")
             
             if pair.action == "buy":
                 # For BUY orders: Accept current price if it's not TOO MUCH HIGHER than target
@@ -122,10 +195,10 @@ class AlpacaClient:
                 if current_price < target_price:
                     savings = target_price - current_price
                     savings_pct = (savings / target_price) * 100
-                    self.logger.info(f"💰 Better entry price! {pair.symbol} @ ${current_price:.2f} "
+                    self.logger.info(f"💰 Better entry price! {trading_symbol} @ ${current_price:.2f} "
                                    f"(target: ${target_price:.2f}, saving: ${savings:.2f} = {savings_pct:.1f}%)")
                 else:
-                    self.logger.info(f"Price check passed: {pair.symbol} @ ${current_price:.2f} "
+                    self.logger.info(f"Price check passed: {trading_symbol} @ ${current_price:.2f} "
                                    f"(target: ${target_price:.2f}, within +{price_flexibility_pct*100:.1f}%)")
                     
             else:  # sell (short)
@@ -139,10 +212,10 @@ class AlpacaClient:
                 if current_price > target_price:
                     bonus = current_price - target_price
                     bonus_pct = (bonus / target_price) * 100
-                    self.logger.info(f"💰 Better exit price! {pair.symbol} @ ${current_price:.2f} "
+                    self.logger.info(f"💰 Better exit price! {trading_symbol} @ ${current_price:.2f} "
                                    f"(target: ${target_price:.2f}, bonus: ${bonus:.2f} = {bonus_pct:.1f}%)")
                 else:
-                    self.logger.info(f"Price check passed: {pair.symbol} @ ${current_price:.2f} "
+                    self.logger.info(f"Price check passed: {trading_symbol} @ ${current_price:.2f} "
                                    f"(target: ${target_price:.2f}, within -{price_flexibility_pct*100:.1f}%)")
                 
             # Create bracket order (entry + stop-loss + take-profit)
@@ -152,9 +225,9 @@ class AlpacaClient:
             stop_price_rounded = round(float(pair.stop_loss), 2)
             take_profit_rounded = round(float(pair.take_profit), 2)
             
-            # Prepare the main order request
+            # Prepare the main order request (use normalized symbol for crypto)
             order_request = MarketOrderRequest(
-                symbol=pair.symbol,
+                symbol=trading_symbol,
                 qty=pair.quantity,
                 side=side,
                 time_in_force=TimeInForce.DAY,
@@ -174,11 +247,11 @@ class AlpacaClient:
                 ), timeout=15.0
             )
             
-            self.logger.info(f"Submitted bracket order for {pair.symbol}: {order.id}")
+            self.logger.info(f"Submitted bracket order for {trading_symbol}: {order.id}")
             
             return {
                 "order_id": order.id,
-                "symbol": pair.symbol,
+                "symbol": trading_symbol,
                 "side": order.side.value,
                 "quantity": int(order.qty),
                 "status": order.status.value,
@@ -188,13 +261,13 @@ class AlpacaClient:
             }
             
         except asyncio.TimeoutError:
-            self.logger.error(f"Timeout executing order for {pair.symbol} - market may be closed")
+            self.logger.error(f"Timeout executing order for {trading_symbol} - market may be closed")
             raise
         except APIError as e:
-            self.logger.error(f"Alpaca API error executing {pair.symbol}: {e}")
+            self.logger.error(f"Alpaca API error executing {trading_symbol}: {e}")
             raise
         except Exception as e:
-            self.logger.error(f"Error executing trading pair {pair.symbol}: {e}")
+            self.logger.error(f"Error executing trading pair {trading_symbol}: {e}")
             raise
             
     async def get_order_status(self, order_id: str) -> Dict[str, Any]:
@@ -314,10 +387,14 @@ class AlpacaClient:
             self.logger.error(f"Error getting portfolio history: {e}")
             return {}
             
-    async def is_market_open(self) -> bool:
-        """Check if market is currently open with timeout protection"""
+    async def is_market_open(self, symbol: str = None) -> bool:
+        """Check if market is currently open (crypto trades 24/7)"""
         try:
-            # Wrap synchronous API call with timeout protection (5 seconds)
+            # If symbol is crypto, it's always tradeable (24/7)
+            if symbol and self._is_crypto_symbol(symbol):
+                return True
+                
+            # For stocks, check market hours
             clock = await asyncio.wait_for(
                 asyncio.get_event_loop().run_in_executor(
                     None, self.trading_client.get_clock
@@ -332,7 +409,7 @@ class AlpacaClient:
             return False
             
     async def validate_trading_pair(self, pair: TradingPair) -> Dict[str, Any]:
-        """Validate a trading pair before execution"""
+        """Validate a trading pair (stocks or crypto) before execution"""
         validation_result = {
             "valid": True,
             "errors": [],
@@ -340,16 +417,23 @@ class AlpacaClient:
         }
         
         try:
+            # Normalize symbol for crypto
+            trading_symbol = self._normalize_crypto_symbol(pair.symbol)
+            is_crypto = self._is_crypto_symbol(trading_symbol)
+            
             # Check if symbol exists and is tradable
-            current_price = await self.get_current_price(pair.symbol)
+            current_price = await self.get_current_price(trading_symbol)
             if not current_price:
+                asset_type = "crypto" if is_crypto else "stock"
                 validation_result["valid"] = False
-                validation_result["errors"].append(f"Symbol {pair.symbol} not found or not tradable")
+                validation_result["errors"].append(f"{asset_type.capitalize()} symbol {trading_symbol} not found or not tradable")
                 return validation_result
                 
-            # Check market hours
-            if not await self.is_market_open():
-                validation_result["warnings"].append("Market is currently closed")
+            # Check market hours (crypto trades 24/7)
+            if not await self.is_market_open(trading_symbol):
+                validation_result["warnings"].append("Stock market is currently closed")
+            elif is_crypto:
+                validation_result["warnings"].append("Crypto trades 24/7 - no market hour restrictions")
                 
             # Check account buying power
             account = await self.get_account_info()

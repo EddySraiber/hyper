@@ -48,6 +48,28 @@ enhanced_news_scraper:
       type: "rss"
       url: "https://www.cnbc.com/id/15839135/device/rss/rss.html"
       priority: 2
+    
+    # Crypto-specific RSS Sources
+    - name: "CoinDesk RSS"
+      type: "rss"
+      url: "https://feeds.coindesk.com/CoinDesk"
+      priority: 1
+    - name: "Cointelegraph RSS"
+      type: "rss"
+      url: "https://cointelegraph.com/rss"
+      priority: 1
+    - name: "CryptoSlate RSS"
+      type: "rss"
+      url: "https://cryptoslate.com/feed/"
+      priority: 2
+    - name: "The Block RSS"
+      type: "rss"
+      url: "https://www.theblock.co/rss.xml"
+      priority: 1
+    - name: "Decrypt RSS"
+      type: "rss"
+      url: "https://decrypt.co/feed"
+      priority: 2
   
   # Enhanced API Sources (real-time financial news APIs)
   api_sources:
@@ -98,6 +120,37 @@ enhanced_news_scraper:
       priority: 3
       rate_limit: 60.0
       api_key_env: "FRED_API_KEY"
+    
+    # Crypto-specific API sources
+    - name: "CoinDesk API"
+      type: "api"
+      url: "https://api.coindesk.com/v1/bpi/currentprice.json"
+      enabled: true
+      priority: 1
+      rate_limit: 10.0
+    
+    - name: "CoinGecko API"
+      type: "api" 
+      url: "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1"
+      enabled: true
+      priority: 1
+      rate_limit: 50.0              # CoinGecko free tier: 50 calls/minute
+    
+    - name: "CryptoCompare News"
+      type: "api"
+      url: "https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest&limit=50"
+      enabled: true
+      priority: 1
+      rate_limit: 100.0             # CryptoCompare free tier
+      api_key_env: "CRYPTOCOMPARE_API_KEY"
+    
+    - name: "Messari News API"
+      type: "api"
+      url: "https://data.messari.io/api/v1/news"
+      enabled: false                # Requires API key
+      priority: 2
+      rate_limit: 20.0
+      api_key_env: "MESSARI_API_KEY"
   
   # Social sentiment and alternative data sources
   social_sources:
@@ -118,6 +171,43 @@ enhanced_news_scraper:
       rate_limit: 60.0
       headers:
         "User-Agent": "AlgoTradingAgent/1.0 Financial Sentiment Analysis"
+    
+    # Crypto-specific social sources
+    - name: "Reddit CryptoCurrency"
+      type: "social"
+      url: "https://www.reddit.com/r/CryptoCurrency/top.json?limit=25&t=hour"
+      enabled: true
+      priority: 1
+      rate_limit: 60.0
+      headers:
+        "User-Agent": "AlgoTradingAgent/1.0 Crypto Sentiment Analysis"
+    
+    - name: "Reddit Bitcoin"
+      type: "social"
+      url: "https://www.reddit.com/r/Bitcoin/top.json?limit=25&t=hour"
+      enabled: true
+      priority: 1
+      rate_limit: 60.0
+      headers:
+        "User-Agent": "AlgoTradingAgent/1.0 Crypto Sentiment Analysis"
+    
+    - name: "Reddit Ethereum"
+      type: "social"
+      url: "https://www.reddit.com/r/ethereum/top.json?limit=25&t=hour"
+      enabled: true
+      priority: 2
+      rate_limit: 60.0
+      headers:
+        "User-Agent": "AlgoTradingAgent/1.0 Crypto Sentiment Analysis"
+    
+    - name: "Reddit CryptoMarkets"
+      type: "social"
+      url: "https://www.reddit.com/r/CryptoMarkets/top.json?limit=25&t=hour"
+      enabled: true
+      priority: 2
+      rate_limit: 60.0
+      headers:
+        "User-Agent": "AlgoTradingAgent/1.0 Crypto Sentiment Analysis"
     
     - name: "Twitter Financial Hashtags"
       type: "social"
@@ -385,6 +475,14 @@ decision_engine:
   breaking_news_multiplier: 1.5    # Multiplier for breaking news momentum
   strong_signal_threshold: 0.7     # Threshold for considering signal "strong"
   high_confidence_source_count: 3  # Number of sources needed for "high confidence"
+  
+  # Crypto-specific parameters
+  crypto_enabled: true              # Enable crypto trading decisions
+  crypto_volatility_factor: 2.0    # Crypto is 2x more volatile than stocks
+  crypto_sentiment_amplifier: 1.3  # Crypto sentiment has 30% more impact
+  crypto_minimum_confidence: 0.12  # Lower confidence threshold for crypto (more volatile)
+  crypto_social_weight: 0.6        # Higher weight for social sentiment in crypto
+  crypto_24_7_trading: true        # Crypto trades 24/7, no market hours restriction
 
 # Risk Manager Configuration
 risk_manager:
@@ -395,6 +493,23 @@ risk_manager:
   correlation_threshold: 0.7
   blacklisted_symbols:
     - "PENN"  # Example blacklisted symbol
+  
+  # Crypto-specific risk management
+  crypto_enabled: true              # Enable crypto position sizing
+  crypto_max_position_pct: 0.03    # 3% per crypto position (more volatile)
+  crypto_max_portfolio_pct: 0.15   # 15% total crypto exposure
+  crypto_stop_loss_pct: 0.08       # 8% stop loss for crypto (higher volatility)
+  crypto_take_profit_pct: 0.15     # 15% take profit for crypto (higher targets)
+  crypto_correlation_threshold: 0.8 # Higher correlation threshold for crypto pairs
+  
+  # Crypto volatility adjustments
+  crypto_volatility_multiplier: 2.5  # Crypto volatility is 2.5x stocks
+  crypto_minimum_trade_size: 1.0     # $1 minimum crypto trade
+  crypto_maximum_trade_size: 3000.0  # $3k maximum crypto trade
+  
+  # Time-based crypto risk limits
+  crypto_night_reduction_factor: 0.8 # Reduce crypto positions during off-hours
+  crypto_weekend_active: true        # Keep crypto trading active on weekends
   
   # Kelly Criterion Configuration
   enable_kelly_criterion: true    # Enable Kelly Criterion position sizing
@@ -631,13 +746,45 @@ observability:
       min_win_rate: 0.40             # Alert if win rate < 40%
       consecutive_losses: 5          # Alert after 5 consecutive losses
 
-# Alpaca API Configuration
+# Alpaca API Configuration (Stocks + Crypto)
 alpaca:
   paper_trading: true
   base_url: "https://paper-api.alpaca.markets"
   data_url: "https://data.alpaca.markets"
   # API keys should be set via environment variables:
   # ALPACA_API_KEY and ALPACA_SECRET_KEY
+  
+  # Crypto Trading Configuration
+  crypto_enabled: true                   # Enable crypto trading through Alpaca
+  crypto_trading_hours: "24/7"          # Crypto trades 24/7
+  
+  # Supported Crypto Assets (Alpaca supports 20+ crypto pairs)
+  crypto_symbols:
+    - "BTCUSD"    # Bitcoin
+    - "ETHUSD"    # Ethereum  
+    - "LTCUSD"    # Litecoin
+    - "DOGEUSD"   # Dogecoin
+    - "SOLUSD"    # Solana
+    - "AVAXUSD"   # Avalanche
+    - "DOTUSD"    # Polkadot
+    - "LINKUSD"   # Chainlink
+    - "SHIBUSD"   # Shiba Inu
+    - "UNIUSD"    # Uniswap
+    - "AAVEUSD"   # Aave
+    - "BCHUSD"    # Bitcoin Cash
+    - "CRVUSD"    # Curve DAO
+    - "GRTUSD"    # The Graph
+    - "MKRUSD"    # Maker
+    - "PEPEUSD"   # Pepe
+    - "SUSHIUSD"  # SushiSwap
+    - "XRPUSD"    # Ripple
+    - "XTZUSD"    # Tezos
+    - "YFIUSD"    # yearn.finance
+  
+  # Crypto-specific trading rules
+  crypto_min_order_size: 1.0            # Minimum $1 order size
+  crypto_fractional_shares: true        # Support fractional crypto shares
+  crypto_commission_free: true          # Alpaca crypto is commission-free
 
 # Binance Crypto Trading Configuration
 binance:

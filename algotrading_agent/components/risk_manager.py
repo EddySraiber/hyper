@@ -21,6 +21,31 @@ class RiskManager(PersistentComponent):
         self.max_kelly_position_pct = config.get("max_kelly_position_pct", 0.10)  # Cap at 10% regardless of Kelly
         self.min_trades_for_kelly = config.get("min_trades_for_kelly", 20)  # Minimum trades needed for Kelly calculation
         
+        # Crypto-specific risk management
+        self.crypto_enabled = config.get("crypto_enabled", True)
+        self.crypto_max_position_pct = config.get("crypto_max_position_pct", 0.03)  # 3% per crypto position
+        self.crypto_max_portfolio_pct = config.get("crypto_max_portfolio_pct", 0.15)  # 15% total crypto exposure
+        self.crypto_stop_loss_pct = config.get("crypto_stop_loss_pct", 0.08)  # 8% stop loss for crypto
+        self.crypto_take_profit_pct = config.get("crypto_take_profit_pct", 0.15)  # 15% take profit for crypto
+        self.crypto_correlation_threshold = config.get("crypto_correlation_threshold", 0.8)  # Higher for crypto
+        self.crypto_volatility_multiplier = config.get("crypto_volatility_multiplier", 2.5)  # Crypto volatility factor
+        self.crypto_minimum_trade_size = config.get("crypto_minimum_trade_size", 1.0)  # $1 minimum
+        self.crypto_maximum_trade_size = config.get("crypto_maximum_trade_size", 3000.0)  # $3k maximum
+        
+        # Time-based crypto risk limits
+        self.crypto_night_reduction_factor = config.get("crypto_night_reduction_factor", 0.8)
+        self.crypto_weekend_active = config.get("crypto_weekend_active", True)
+        
+        # Supported crypto symbols for detection
+        self.crypto_symbols = {
+            'BTCUSD', 'ETHUSD', 'LTCUSD', 'DOGEUSD', 'SOLUSD', 'AVAXUSD', 
+            'DOTUSD', 'LINKUSD', 'SHIBUSD', 'UNIUSD', 'AAVEUSD', 'BCHUSD',
+            'CRVUSD', 'GRTUSD', 'MKRUSD', 'PEPEUSD', 'SUSHIUSD', 'XRPUSD', 
+            'XTZUSD', 'YFIUSD', 'BTC', 'ETH', 'LTC', 'DOGE', 'SOL', 'AVAX',
+            'DOT', 'LINK', 'SHIB', 'UNI', 'AAVE', 'BCH', 'CRV', 'GRT', 'MKR',
+            'PEPE', 'SUSHI', 'XRP', 'XTZ', 'YFI'
+        }
+        
         # Load current positions from memory
         self.current_positions = self.get_memory("current_positions", {})
         self.daily_pnl = self.get_memory("daily_pnl", 0.0)
@@ -28,6 +53,34 @@ class RiskManager(PersistentComponent):
         
         # Load trade history for Kelly Criterion calculations
         self.trade_history = self.get_memory("trade_history", [])
+    
+    def _is_crypto_symbol(self, symbol: str) -> bool:
+        """Check if a symbol is a cryptocurrency"""
+        symbol = symbol.upper().replace('/', '').replace('-', '')
+        return symbol in self.crypto_symbols
+    
+    def _normalize_crypto_symbol(self, symbol: str) -> str:
+        """Normalize crypto symbol format"""
+        symbol = symbol.upper()
+        
+        crypto_mappings = {
+            'BTC': 'BTCUSD', 'ETH': 'ETHUSD', 'LTC': 'LTCUSD',
+            'DOGE': 'DOGEUSD', 'SOL': 'SOLUSD', 'AVAX': 'AVAXUSD',
+            'DOT': 'DOTUSD', 'LINK': 'LINKUSD', 'SHIB': 'SHIBUSD',
+            'UNI': 'UNIUSD', 'AAVE': 'AAVEUSD', 'BCH': 'BCHUSD'
+        }
+        
+        return crypto_mappings.get(symbol, symbol)
+    
+    def _calculate_crypto_exposure(self) -> float:
+        """Calculate current total crypto exposure as percentage of portfolio"""
+        total_crypto_value = 0.0
+        
+        for symbol, position in self.current_positions.items():
+            if self._is_crypto_symbol(symbol):
+                total_crypto_value += position.get('market_value', 0.0)
+                
+        return total_crypto_value / self.max_portfolio_value if self.max_portfolio_value > 0 else 0.0
         
     def start(self) -> None:
         self.logger.info("Starting Risk Manager")
@@ -77,11 +130,42 @@ class RiskManager(PersistentComponent):
             self.logger.warning("Daily loss limit exceeded")
             return False
             
-        # Check position size limit
+        # Check position size limit (crypto-specific or regular)
         position_value = pair.entry_price * pair.quantity
-        max_position_value = self.max_portfolio_value * self.max_position_pct
+        is_crypto = self._is_crypto_symbol(pair.symbol)
+        
+        if is_crypto and self.crypto_enabled:
+            # Apply crypto-specific position limits
+            max_position_pct = self.crypto_max_position_pct
+            max_position_value = self.max_portfolio_value * max_position_pct
+            
+            # Check crypto-specific trade size limits
+            if position_value < self.crypto_minimum_trade_size:
+                self.logger.warning(f"Crypto position {pair.symbol} below minimum ${self.crypto_minimum_trade_size}")
+                return False
+                
+            if position_value > self.crypto_maximum_trade_size:
+                self.logger.warning(f"Crypto position {pair.symbol} above maximum ${self.crypto_maximum_trade_size}")
+                return False
+                
+            # Check total crypto portfolio exposure
+            current_crypto_exposure = self._calculate_crypto_exposure()
+            new_crypto_exposure = current_crypto_exposure + (position_value / self.max_portfolio_value)
+            
+            if new_crypto_exposure > self.crypto_max_portfolio_pct:
+                self.logger.warning(f"Crypto portfolio exposure would exceed {self.crypto_max_portfolio_pct*100:.1f}% limit")
+                return False
+                
+            asset_type = "crypto"
+        else:
+            # Regular stock position limits
+            max_position_pct = self.max_position_pct
+            max_position_value = self.max_portfolio_value * max_position_pct
+            asset_type = "stock"
+        
         if position_value > max_position_value:
-            self.logger.warning(f"Position size too large for {pair.symbol}")
+            self.logger.warning(f"{asset_type.capitalize()} position size too large for {pair.symbol}: "
+                               f"${position_value:.2f} > ${max_position_value:.2f}")
             return False
             
         # Check if we already have a position in this symbol
@@ -204,9 +288,19 @@ class RiskManager(PersistentComponent):
             return (entry_price - exit_price) * quantity
 
     def _adjust_for_risk(self, pair: TradingPair) -> TradingPair:
-        # Adjust stop loss based on volatility (simplified)
+        # Check if this is crypto and apply crypto-specific adjustments
+        is_crypto = self._is_crypto_symbol(pair.symbol)
+        
+        # Adjust stop loss based on volatility (crypto-aware)
         volatility_factor = self._estimate_volatility(pair.symbol)
-        default_stop_loss_pct = 0.05  # 5% default
+        
+        if is_crypto and self.crypto_enabled:
+            # Crypto has higher volatility, use crypto-specific stop loss percentage
+            default_stop_loss_pct = self.crypto_stop_loss_pct  # 8% for crypto
+            volatility_factor *= self.crypto_volatility_multiplier  # Amplify volatility factor
+            self.logger.info(f"🚀 Applying crypto risk adjustments to {pair.symbol}")
+        else:
+            default_stop_loss_pct = 0.05  # 5% default for stocks
         
         if pair.action == "buy":
             # Widen stop loss for volatile stocks
@@ -216,16 +310,26 @@ class RiskManager(PersistentComponent):
             adjusted_stop = pair.entry_price * (1 + default_stop_loss_pct * volatility_factor)
             pair.stop_loss = max(pair.stop_loss, adjusted_stop)
             
-        # Use Kelly Criterion for optimal position sizing
+        # Use Kelly Criterion for optimal position sizing (crypto-aware)
         kelly_fraction = self._calculate_kelly_criterion(pair.symbol, pair.action)
+        
+        # Apply crypto-specific position sizing constraints
+        if is_crypto and self.crypto_enabled:
+            # Cap crypto positions at crypto-specific maximum percentage
+            max_crypto_fraction = self.crypto_max_position_pct
+            kelly_fraction = min(kelly_fraction, max_crypto_fraction)
+        
         kelly_position_value = self.max_portfolio_value * kelly_fraction
         
         # Calculate position size based on Kelly Criterion
         if pair.entry_price > 0:
             kelly_quantity = int(kelly_position_value / pair.entry_price)
             
-            # Also consider risk per share for safety
-            max_risk_per_trade = self.max_portfolio_value * 0.01  # 1% risk per trade
+            # Also consider risk per share for safety (adjusted for crypto)
+            if is_crypto and self.crypto_enabled:
+                max_risk_per_trade = self.max_portfolio_value * 0.015  # 1.5% risk per crypto trade
+            else:
+                max_risk_per_trade = self.max_portfolio_value * 0.01  # 1% risk per stock trade
             
             if pair.action == "buy":
                 risk_per_share = pair.entry_price - pair.stop_loss

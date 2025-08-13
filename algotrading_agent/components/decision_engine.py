@@ -48,6 +48,24 @@ class DecisionEngine(ComponentBase):
         self.default_take_profit_pct = config.get("default_take_profit_pct", 0.10)
         self.alpaca_client = None  # Will be injected by main app
         self.universal_client = None  # Will be injected by main app for crypto support
+        
+        # Crypto-specific configuration
+        self.crypto_enabled = config.get("crypto_enabled", True)
+        self.crypto_volatility_factor = config.get("crypto_volatility_factor", 2.0)
+        self.crypto_sentiment_amplifier = config.get("crypto_sentiment_amplifier", 1.3)
+        self.crypto_minimum_confidence = config.get("crypto_minimum_confidence", 0.12)
+        self.crypto_social_weight = config.get("crypto_social_weight", 0.6)
+        self.crypto_24_7_trading = config.get("crypto_24_7_trading", True)
+        
+        # Supported crypto symbols for detection
+        self.crypto_symbols = {
+            'BTCUSD', 'ETHUSD', 'LTCUSD', 'DOGEUSD', 'SOLUSD', 'AVAXUSD', 
+            'DOTUSD', 'LINKUSD', 'SHIBUSD', 'UNIUSD', 'AAVEUSD', 'BCHUSD',
+            'CRVUSD', 'GRTUSD', 'MKRUSD', 'PEPEUSD', 'SUSHIUSD', 'XRPUSD', 
+            'XTZUSD', 'YFIUSD', 'BTC', 'ETH', 'LTC', 'DOGE', 'SOL', 'AVAX',
+            'DOT', 'LINK', 'SHIB', 'UNI', 'AAVE', 'BCH', 'CRV', 'GRT', 'MKR',
+            'PEPE', 'SUSHI', 'XRP', 'XTZ', 'YFI'
+        }
         self.news_impact_scorer = None  # Will be injected by main app for enhanced analysis
         
         # Enhanced parameters for temporal and context analysis
@@ -55,6 +73,67 @@ class DecisionEngine(ComponentBase):
         self.strength_correlation_weight = config.get("strength_correlation_weight", 0.15)  # Weight for strength correlation  
         self.market_context_weight = config.get("market_context_weight", 0.15)  # Weight for market context
         self.enable_enhanced_analysis = config.get("enable_enhanced_analysis", True)  # Toggle for enhanced features
+    
+    def _is_crypto_symbol(self, symbol: str) -> bool:
+        """Check if a symbol is a cryptocurrency"""
+        symbol = symbol.upper().replace('/', '').replace('-', '')
+        return symbol in self.crypto_symbols
+    
+    def _normalize_crypto_symbol(self, symbol: str) -> str:
+        """Normalize crypto symbol format"""
+        symbol = symbol.upper()
+        
+        crypto_mappings = {
+            'BTC': 'BTCUSD', 'ETH': 'ETHUSD', 'LTC': 'LTCUSD',
+            'DOGE': 'DOGEUSD', 'SOL': 'SOLUSD', 'AVAX': 'AVAXUSD',
+            'DOT': 'DOTUSD', 'LINK': 'LINKUSD', 'SHIB': 'SHIBUSD',
+            'UNI': 'UNIUSD', 'AAVE': 'AAVEUSD', 'BCH': 'BCHUSD'
+        }
+        
+        return crypto_mappings.get(symbol, symbol)
+    
+    def _extract_crypto_symbols_from_text(self, text: str) -> List[str]:
+        """Extract crypto symbols mentioned in text"""
+        import re
+        
+        # Common crypto patterns in text
+        crypto_patterns = [
+            r'\b(bitcoin|btc)\b', r'\b(ethereum|eth)\b', r'\b(dogecoin|doge)\b',
+            r'\b(solana|sol)\b', r'\b(cardano|ada)\b', r'\b(polkadot|dot)\b',
+            r'\b(chainlink|link)\b', r'\b(litecoin|ltc)\b', r'\b(shiba|shib)\b',
+            r'\b(uniswap|uni)\b', r'\b(avalanche|avax)\b', r'\b(aave)\b'
+        ]
+        
+        found_cryptos = []
+        text_lower = text.lower()
+        
+        for pattern in crypto_patterns:
+            matches = re.findall(pattern, text_lower)
+            for match in matches:
+                if match in ['bitcoin', 'btc']:
+                    found_cryptos.append('BTCUSD')
+                elif match in ['ethereum', 'eth']:
+                    found_cryptos.append('ETHUSD')
+                elif match in ['dogecoin', 'doge']:
+                    found_cryptos.append('DOGEUSD')
+                elif match in ['solana', 'sol']:
+                    found_cryptos.append('SOLUSD')
+                elif match in ['polkadot', 'dot']:
+                    found_cryptos.append('DOTUSD')
+                elif match in ['chainlink', 'link']:
+                    found_cryptos.append('LINKUSD')
+                elif match in ['litecoin', 'ltc']:
+                    found_cryptos.append('LTCUSD')
+                elif match in ['shiba', 'shib']:
+                    found_cryptos.append('SHIBUSD')
+                elif match in ['uniswap', 'uni']:
+                    found_cryptos.append('UNIUSD')
+                elif match in ['avalanche', 'avax']:
+                    found_cryptos.append('AVAXUSD')
+                elif match == 'aave':
+                    found_cryptos.append('AAVEUSD')
+        
+        return list(set(found_cryptos))
         
     def start(self) -> None:
         self.logger.info("Starting Decision Engine")
@@ -179,7 +258,16 @@ class DecisionEngine(ComponentBase):
         signal_strength = self._calculate_signal_strength(news_items)
         confidence = self._calculate_confidence(news_items, signal_strength)
         
-        if confidence < self.min_confidence:
+        # Check if this is crypto-related news to apply different confidence threshold
+        symbols = self._extract_symbols_from_news(news_items)
+        is_crypto_related = any(self._is_crypto_symbol(symbol) for symbol in symbols)
+        
+        # Use crypto-specific confidence threshold if applicable
+        effective_min_confidence = self.crypto_minimum_confidence if is_crypto_related else self.min_confidence
+        
+        if confidence < effective_min_confidence:
+            asset_type = "crypto" if is_crypto_related else "stock"
+            self.logger.debug(f"Confidence {confidence:.3f} below {asset_type} threshold {effective_min_confidence:.3f}")
             return None
             
         # Determine action (buy/sell)
@@ -256,6 +344,16 @@ class DecisionEngine(ComponentBase):
             # Calculate weighted signal
             sentiment_score = sentiment.get("polarity", 0.0)
             
+            # Apply crypto-specific sentiment amplification
+            is_crypto_news = any(self._is_crypto_symbol(symbol) for symbol in symbols)
+            if is_crypto_news and self.crypto_enabled:
+                sentiment_score *= self.crypto_sentiment_amplifier
+                
+                # Apply higher weight to social sentiment for crypto
+                social_metrics = item.get("social_metrics", {})
+                if social_metrics:
+                    sentiment_score *= self.crypto_social_weight
+            
             # Base weight calculation (traditional approach)
             base_weight = (
                 impact_score * self.impact_weight +
@@ -277,12 +375,41 @@ class DecisionEngine(ComponentBase):
         return total_signal / max(total_weight, 0.001)
     
     def _extract_symbols_from_news(self, news_items: List[Dict[str, Any]]) -> List[str]:
-        """Extract all symbols mentioned in the news items"""
+        """Extract all symbols (stocks and crypto) mentioned in the news items"""
         symbols = []
+        
         for item in news_items:
+            # Extract traditional stock tickers
             entities = item.get("entities", {})
             tickers = entities.get("tickers", [])
             symbols.extend(tickers)
+            
+            # Extract crypto symbols from content
+            title = item.get("title", "")
+            content = item.get("content", "")
+            full_text = f"{title} {content}"
+            
+            crypto_symbols = self._extract_crypto_symbols_from_text(full_text)
+            symbols.extend(crypto_symbols)
+            
+            # Check for crypto category/tags
+            category = item.get("category", "")
+            if category in ["crypto_news", "crypto_market_data", "crypto_price", "crypto_analysis"]:
+                # This is crypto-related news, try to extract symbols more aggressively
+                if "bitcoin" in full_text.lower() or "btc" in full_text.lower():
+                    symbols.append("BTCUSD")
+                if "ethereum" in full_text.lower() or "eth" in full_text.lower():
+                    symbols.append("ETHUSD")
+                    
+            # Check social metrics for crypto mentions (from Reddit, Twitter)
+            social_metrics = item.get("social_metrics", {})
+            if social_metrics and item.get("tickers"):
+                # Social media post with ticker mentions
+                for ticker in item.get("tickers", []):
+                    normalized = self._normalize_crypto_symbol(ticker)
+                    if self._is_crypto_symbol(normalized):
+                        symbols.append(normalized)
+                        
         return list(set(symbols))  # Remove duplicates
     
     def _calculate_enhanced_weight(self, item: Dict[str, Any], sentiment_score: float, symbols: List[str]) -> float:
@@ -454,6 +581,17 @@ class DecisionEngine(ComponentBase):
         # Default values
         take_profit_pct = self.default_take_profit_pct
         stop_loss_pct = self.default_stop_loss_pct
+        
+        # Check if this is crypto-related and apply crypto-specific adjustments
+        symbols = self._extract_symbols_from_news(news_items)
+        is_crypto_related = any(self._is_crypto_symbol(symbol) for symbol in symbols)
+        
+        if is_crypto_related and self.crypto_enabled:
+            # Crypto is more volatile - wider stop losses and take profits
+            take_profit_pct *= self.crypto_volatility_factor  # 10% -> 20% for crypto
+            stop_loss_pct *= (self.crypto_volatility_factor * 0.8)  # 5% -> 8% for crypto (tighter ratio)
+            self.logger.info(f"🚀 CRYPTO DETECTED: Adjusting targets for higher volatility - "
+                           f"TP: {take_profit_pct*100:.1f}%, SL: {stop_loss_pct*100:.1f}%")
         
         # Traditional checks
         has_breaking_news = any(item.get("priority") == "breaking" for item in news_items)

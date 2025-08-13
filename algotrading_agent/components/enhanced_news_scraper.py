@@ -588,6 +588,77 @@ class EnhancedNewsScraper(ComponentBase):
                         "raw_data": item
                     }
                     articles.append(article)
+            elif "coindesk" in source.name.lower():
+                # CoinDesk API format  
+                bpi_data = data.get("bpi", {})
+                if bpi_data:
+                    for currency, info in bpi_data.items():
+                        article = {
+                            "title": f"Bitcoin Price Update: {currency}",
+                            "content": f"Bitcoin rate: {info.get('rate', 'N/A')} {info.get('description', '')}",
+                            "url": "https://www.coindesk.com/price/bitcoin",
+                            "published": self._parse_date(data.get("time", {}).get("updated", "")),
+                            "source": source.name,
+                            "category": "crypto_price",
+                            "raw_data": info
+                        }
+                        articles.append(article)
+                        
+            elif "coingecko" in source.name.lower():
+                # CoinGecko API format
+                for coin in data:
+                    price_change_24h = coin.get('price_change_percentage_24h', 0)
+                    article = {
+                        "title": f"{coin.get('name', '')} ({coin.get('symbol', '').upper()}) Price Movement",
+                        "content": f"Current price: ${coin.get('current_price', 0)}, 24h change: {price_change_24h:.2f}%",
+                        "url": f"https://www.coingecko.com/en/coins/{coin.get('id', '')}",
+                        "published": datetime.utcnow(),
+                        "source": source.name,
+                        "symbol": coin.get('symbol', '').upper(),
+                        "price": coin.get('current_price', 0),
+                        "price_change_24h": price_change_24h,
+                        "market_cap": coin.get('market_cap', 0),
+                        "category": "crypto_market_data",
+                        "raw_data": coin
+                    }
+                    articles.append(article)
+                    
+            elif "cryptocompare" in source.name.lower():
+                # CryptoCompare News API format
+                news_data = data.get("Data", [])
+                for item in news_data:
+                    published_date = self._parse_timestamp(item.get("published_on", 0))
+                    article = {
+                        "title": item.get("title", ""),
+                        "content": item.get("body", ""),
+                        "url": item.get("url", ""),
+                        "published": published_date,
+                        "source": source.name,
+                        "author": item.get("source", ""),
+                        "image": item.get("imageurl", ""),
+                        "categories": item.get("categories", "").split("|"),
+                        "category": "crypto_news",
+                        "raw_data": item
+                    }
+                    articles.append(article)
+                    
+            elif "messari" in source.name.lower():
+                # Messari News API format
+                news_items = data.get("data", [])
+                for item in news_items:
+                    published_date = self._parse_date(item.get("published_at", ""))
+                    article = {
+                        "title": item.get("title", ""),
+                        "content": item.get("content", ""),
+                        "url": item.get("url", ""),
+                        "published": published_date,
+                        "source": source.name,
+                        "author": item.get("author", {}).get("name", ""),
+                        "tags": item.get("tags", []),
+                        "category": "crypto_analysis",
+                        "raw_data": item
+                    }
+                    articles.append(article)
             else:
                 # Generic API format
                 self.logger.warning(f"Unknown API format for {source.name}")
