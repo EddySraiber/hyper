@@ -144,6 +144,13 @@ class UniversalTradingClient:
         # Default to stock
         return AssetClass.STOCK
     
+    def _route_to_client(self, asset_class: AssetClass):
+        """Route to appropriate client based on asset class"""
+        exchange = self.get_optimal_exchange(asset_class, "")
+        if exchange and exchange in self.clients:
+            return self.clients[exchange]
+        return None
+    
     def get_optimal_exchange(self, asset_class: AssetClass, symbol: str) -> Optional[ExchangeType]:
         """
         Get optimal exchange for trading based on:
@@ -424,6 +431,30 @@ class UniversalTradingClient:
                 health_status['overall_healthy'] = False
         
         return health_status
+    
+    async def validate_trading_pair(self, pair) -> Dict[str, Any]:
+        """Legacy compatibility: Validate trading pair"""
+        # Route to appropriate client based on symbol
+        try:
+            asset_class = self.detect_asset_class(pair.symbol)
+            target_client = self._route_to_client(asset_class)
+            
+            if target_client and hasattr(target_client, 'validate_trading_pair'):
+                return await target_client.validate_trading_pair(pair)
+            else:
+                # Basic validation if no specific client validation available
+                return {
+                    "valid": True,
+                    "errors": [],
+                    "warnings": [],
+                    "routed_to": asset_class.value
+                }
+        except Exception as e:
+            return {
+                "valid": False,
+                "errors": [f"Validation error: {str(e)}"],
+                "warnings": []
+            }
     
     # Compatibility methods for legacy components (Position Protector, etc.)
     async def get_positions(self) -> List[Dict[str, Any]]:

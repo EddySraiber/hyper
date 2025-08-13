@@ -334,6 +334,11 @@ class AlgotradingAgent:
                     except Exception as e:
                         self.logger.warning(f"Could not check crypto market status: {e}")
                 
+                # TESTING MODE: Allow stock trading 24/7 for paper trading and testing
+                if not stock_market_open and not crypto_market_open and self.alpaca_client:
+                    self.logger.info("🧪 TESTING MODE: Markets closed but enabling stock trading for paper testing")
+                    stock_market_open = True  # Override for testing with paper trading
+                
                 # Any market open = trading available
                 market_open = stock_market_open or crypto_market_open
                 

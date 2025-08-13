@@ -38,6 +38,10 @@ class EnhancedTradeManager(PersistentComponent):
         self.max_concurrent_trades = config.get("max_concurrent_trades", 10)
         self.enable_legacy_compatibility = config.get("enable_legacy_compatibility", True)
         
+        # Legacy compatibility attributes
+        self.price_flexibility_pct = config.get("price_flexibility_pct", 0.01)  # 1% default
+        self.active_trades: Dict[str, Any] = {}  # For legacy compatibility
+        
         # External dependencies (injected by main app)
         self.alpaca_client: Optional[AlpacaClient] = None
         self.universal_client: Optional[UniversalTradingClient] = None

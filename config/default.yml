@@ -474,7 +474,7 @@ alpaca:
 
 # Binance Crypto Trading Configuration
 binance:
-  enabled: true                         # Enable crypto trading (24/7 markets)
+  enabled: false                        # DISABLED - Placeholder API keys causing failures
   testnet: true                         # Use testnet for safe testing (disable for live trading)
   base_url: "https://testnet.binance.vision"  # Testnet URL
   api_key_env: "BINANCE_API_KEY"        # Environment variable for API key

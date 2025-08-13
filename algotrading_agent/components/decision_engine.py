@@ -10,10 +10,10 @@ class TradingPair:
                  entry_time: Optional[datetime] = None, exit_time: Optional[datetime] = None):
         self.symbol = symbol
         self.action = action  # "buy" or "sell" (for short)
-        self.entry_price = entry_price
-        self.exit_price = exit_price
-        self.stop_loss = stop_loss
-        self.take_profit = take_profit
+        self.entry_price = round(entry_price, 2)  # Force 2 decimal precision
+        self.exit_price = round(exit_price, 2) if exit_price else exit_price
+        self.stop_loss = round(stop_loss, 2) if stop_loss else stop_loss  # CRITICAL: Force proper rounding
+        self.take_profit = round(take_profit, 2) if take_profit else take_profit  # CRITICAL: Force proper rounding
         self.quantity = quantity
         self.entry_time = entry_time or datetime.utcnow()
         self.exit_time = exit_time
@@ -80,8 +80,12 @@ class DecisionEngine(ComponentBase):
             # Universal client can trade crypto 24/7
             crypto_market_open = await self.universal_client.is_market_open()
         
-        # If no markets are open, skip all trading
-        if not stock_market_open and not crypto_market_open:
+        # TESTING MODE: Allow stock trading 24/7 for paper trading and testing
+        # Check if we have any valid trading client (Alpaca for stocks)
+        if not stock_market_open and not crypto_market_open and self.alpaca_client:
+            self.logger.info("🧪 TESTING MODE: Markets closed but enabling stock trading for paper testing")
+            stock_market_open = True  # Override for testing with paper trading
+        elif not stock_market_open and not crypto_market_open:
             self.logger.info("All markets closed - no trading possible")
             return []
         

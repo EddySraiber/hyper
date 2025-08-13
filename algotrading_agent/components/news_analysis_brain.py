@@ -370,20 +370,43 @@ class NewsAnalysisBrain(ComponentBase):
                 "pepsi": "PEP", "walmart": "WMT", "jpmorgan": "JPM", "bank of america": "BAC",
                 "wells fargo": "WFC", "goldman sachs": "GS", "morgan stanley": "MS", "visa": "V",
                 "mastercard": "MA", "intel": "INTC", "amd": "AMD", "netflix": "NFLX", "disney": "DIS",
-                "salesforce": "CRM", "oracle": "ORCL", "ibm": "IBM", "ge": "GE", "general electric": "GE",
+                "salesforce": "CRM", "oracle": "ORCL", "ibm": "IBM", "general electric": "GE",
                 "ford": "F", "general motors": "GM", "exxon": "XOM", "chevron": "CVX", "pfizer": "PFE",
-                "johnson": "JNJ", "merck": "MRK", "abbvie": "ABBV", "bristol myers": "BMY"
+                "johnson": "JNJ", "merck": "MRK", "abbvie": "ABBV", "bristol myers": "BMY",
+                # Recently added companies
+                "monday.com": "MNDY", "monday": "MNDY", "tencent": "TCEHY", "coreweave": "NVDA",
+                "presight": "AI", "apollo": "APO", "kelvion": "APO", 
+                "palantir": "PLTR", "coinbase": "COIN", "uber": "UBER", "airbnb": "ABNB", "zoom": "ZM",
+                "slack": "CRM", "snowflake": "SNOW", "databricks": "DBRX", "openai": "NVDA",
+                "beyond": "BBBY", "bed bath": "BBBY", "charter": "CHTR", "liberty": "LBRDA",
+                "cadillac": "GM", "vistiq": "GM", "buy buy baby": "BBBY", "broadband": "CHTR"
             }
             
             # Only extract explicitly mentioned stock tickers with $ prefix
             dollar_tickers = re.findall(r'\$([A-Z]{1,5})\b', text)
             entities["tickers"].extend(dollar_tickers)
             
-            # Extract company names and map to tickers
-            for company_name, ticker in company_ticker_map.items():
-                if company_name in text_lower:
-                    entities["tickers"].append(ticker)
-                    entities["companies"].append(company_name)
+            # Extract company names and map to tickers (sort by length to match longest first)
+            sorted_companies = sorted(company_ticker_map.items(), key=lambda x: len(x[0]), reverse=True)
+            matched_companies = set()
+            
+            for company_name, ticker in sorted_companies:
+                # Skip if we already matched a longer version of this company
+                if any(company_name in matched for matched in matched_companies):
+                    continue
+                
+                # Use word boundary matching for better accuracy
+                if len(company_name) <= 3:  # Short names like "ge" need exact word match
+                    pattern = r'\b' + re.escape(company_name) + r'\b'
+                    if re.search(pattern, text_lower):
+                        entities["tickers"].append(ticker)
+                        entities["companies"].append(company_name)
+                        matched_companies.add(company_name)
+                else:
+                    if company_name in text_lower:
+                        entities["tickers"].append(ticker)
+                        entities["companies"].append(company_name)
+                        matched_companies.add(company_name)
             
             # Add specific tickers for economic news only if exact phrases match
             if "jobless claims" in text_lower or "unemployment" in text_lower:

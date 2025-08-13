@@ -148,6 +148,10 @@ class AlpacaClient:
             # Create bracket order (entry + stop-loss + take-profit)
             side = OrderSide.BUY if pair.action == "buy" else OrderSide.SELL
             
+            # CRITICAL: Force precise rounding for Alpaca API compliance
+            stop_price_rounded = round(float(pair.stop_loss), 2)
+            take_profit_rounded = round(float(pair.take_profit), 2)
+            
             # Prepare the main order request
             order_request = MarketOrderRequest(
                 symbol=pair.symbol,
@@ -156,10 +160,10 @@ class AlpacaClient:
                 time_in_force=TimeInForce.DAY,
                 order_class=OrderClass.BRACKET,
                 stop_loss=StopLossRequest(
-                    stop_price=pair.stop_loss
+                    stop_price=stop_price_rounded
                 ),
                 take_profit=TakeProfitRequest(
-                    limit_price=pair.take_profit
+                    limit_price=take_profit_rounded
                 )
             )
             
