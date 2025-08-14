@@ -289,7 +289,7 @@ class GuardianService:
         return False
     
     async def _remediate_leak(self, symbol: str):
-        """Attempt to fix a detected leak"""
+        """Attempt to fix a detected leak with time-based emergency liquidation"""
         if symbol not in self.active_leaks:
             return
         
@@ -297,8 +297,22 @@ class GuardianService:
         leak.remediation_attempts += 1
         leak.last_remediation = datetime.utcnow()
         
+        # Calculate how long this leak has been trying to be fixed
+        leak_age_hours = (datetime.utcnow() - leak.discovered_at).total_seconds() / 3600
+        
         try:
-            self.logger.info(f"🔧 Remediating {leak.leak_type.value}: {symbol} (attempt {leak.remediation_attempts})")
+            self.logger.info(f"🔧 Remediating {leak.leak_type.value}: {symbol} (attempt {leak.remediation_attempts}, age: {leak_age_hours:.1f}h)")
+            
+            # TIME-BASED EMERGENCY LIQUIDATION
+            # If position has been unprotectable for too long, force liquidate it
+            max_unprotected_hours = 4.0  # Maximum time to allow unprotected positions
+            
+            if (leak_age_hours > max_unprotected_hours or 
+                leak.remediation_attempts >= 50):  # Also liquidate after 50 failed attempts
+                
+                self.logger.error(f"🚨 TIME LIMIT EXCEEDED: {symbol} unprotected for {leak_age_hours:.1f}h - FORCE LIQUIDATING")
+                await self._emergency_liquidate_leak(symbol)
+                return
             
             # Strategy depends on leak type
             if leak.leak_type == LeakType.TEST_ORDER:
@@ -311,18 +325,26 @@ class GuardianService:
                 
             elif leak.leak_type in [LeakType.ORPHANED_POSITION, LeakType.PARTIAL_PROTECTION]:
                 # Try to add missing protective orders
-                await self._add_missing_protection(symbol, leak)
-            
-            # If too many attempts, consider emergency liquidation
-            elif (leak.remediation_attempts >= self.max_remediation_attempts and 
-                  self.emergency_liquidation_enabled and 
-                  leak.risk_level in ["high", "critical"]):
-                await self._emergency_liquidate_leak(symbol)
+                success = await self._add_missing_protection(symbol, leak)
+                
+                # If protection keeps failing, check for emergency liquidation based on attempts
+                if (not success and 
+                    leak.remediation_attempts >= self.max_remediation_attempts and 
+                    self.emergency_liquidation_enabled and 
+                    leak.risk_level in ["medium", "high", "critical"]):
+                    
+                    self.logger.warning(f"🚨 PROTECTION REPEATEDLY FAILED: {symbol} ({leak.remediation_attempts} attempts) - considering emergency liquidation")
+                    await self._emergency_liquidate_leak(symbol)
                 
         except Exception as e:
             error_msg = f"Remediation failed: {e}"
             leak.errors.append(error_msg)
             self.logger.error(f"❌ {symbol} remediation failed: {error_msg}")
+            
+            # If remediation itself is crashing repeatedly, force liquidate
+            if leak.remediation_attempts >= 20:
+                self.logger.error(f"🚨 REMEDIATION CRASHES: {symbol} remediation failing repeatedly - FORCE LIQUIDATING")
+                await self._emergency_liquidate_leak(symbol)
     
     async def _close_test_position(self, symbol: str):
         """Close a position identified as a test order"""
@@ -363,21 +385,32 @@ class GuardianService:
         except Exception as e:
             self.logger.error(f"❌ Crypto protection failed for {symbol}: {e}")
     
-    async def _add_missing_protection(self, symbol: str, leak: PositionLeak):
+    async def _add_missing_protection(self, symbol: str, leak: PositionLeak) -> bool:
         """Add missing stop-loss and/or take-profit orders"""
         try:
             # Get current price
             current_price = await self.alpaca_client.get_current_price(symbol)
             if not current_price:
-                raise ValueError(f"Cannot get current price for {symbol}")
+                self.logger.warning(f"⚠️  Cannot get current price for {symbol} - using estimated price")
+                current_price = abs(leak.market_value / leak.quantity) if leak.quantity != 0 else 100.0
             
-            # Calculate protection levels
+            # Calculate protection levels with wider spreads for volatile positions
+            spread_multiplier = 1.0
+            if abs(leak.unrealized_pl) > 100:  # Wider spreads for losing positions
+                spread_multiplier = 1.5
+            
             if leak.quantity > 0:  # Long position
-                stop_price = round(current_price * 0.95, 2)  # 5% stop-loss
-                take_profit_price = round(current_price * 1.10, 2)  # 10% take-profit
+                stop_loss_pct = 0.05 * spread_multiplier  # 5-7.5% stop-loss
+                take_profit_pct = 0.10 * spread_multiplier  # 10-15% take-profit
+                stop_price = round(current_price * (1 - stop_loss_pct), 2)
+                take_profit_price = round(current_price * (1 + take_profit_pct), 2)
             else:  # Short position
-                stop_price = round(current_price * 1.05, 2)  # 5% stop-loss
-                take_profit_price = round(current_price * 0.90, 2)  # 10% take-profit
+                stop_loss_pct = 0.05 * spread_multiplier
+                take_profit_pct = 0.10 * spread_multiplier
+                stop_price = round(current_price * (1 + stop_loss_pct), 2)
+                take_profit_price = round(current_price * (1 - take_profit_pct), 2)
+            
+            self.logger.info(f"🛡️  Attempting protection for {symbol}: SL=${stop_price}, TP=${take_profit_price} (spread: {spread_multiplier}x)")
             
             # Try to add missing orders
             results = await self.alpaca_client.update_position_parameters(
@@ -385,10 +418,12 @@ class GuardianService:
             )
             
             if results["success"]:
-                self.logger.info(f"🛡️  Added protection for {symbol}: SL=${stop_price}, TP=${take_profit_price}")
+                self.logger.info(f"✅ Successfully added protection for {symbol}")
                 return True
             else:
-                self.logger.error(f"❌ Protection failed for {symbol}: {results['errors']}")
+                # Log specific error details
+                errors = results.get('errors', ['Unknown error'])
+                self.logger.error(f"❌ Protection failed for {symbol}: {'; '.join(errors)}")
                 return False
                 
         except Exception as e:

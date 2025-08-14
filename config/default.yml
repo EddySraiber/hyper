@@ -556,10 +556,12 @@ enhanced_trade_manager:
   # 🛡️ Guardian Service Settings - High-frequency leak detection
   guardian_service:
     guardian_scan_interval: 30      # Scan every 30 seconds (high-frequency)
-    max_remediation_attempts: 3     # Up to 3 remediation attempts per leak
-    emergency_liquidation_enabled: true   # Allow emergency liquidation for critical leaks
+    max_remediation_attempts: 5     # Up to 5 remediation attempts per leak
+    emergency_liquidation_enabled: true   # Allow emergency liquidation for persistent leaks
     crypto_protection_enabled: true       # Enable crypto position protection
     test_order_detection: true             # Auto-detect and close test orders
+    max_unprotected_hours: 4.0             # Force liquidate positions unprotected > 4 hours
+    max_remediation_crashes: 20            # Force liquidate after 20 remediation crashes
     risk_thresholds:
       critical_value: 5000                # Critical risk above $5000
       high_value: 1000                    # High risk above $1000
