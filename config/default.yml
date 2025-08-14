@@ -217,24 +217,24 @@ enhanced_news_scraper:
       rate_limit: 900.0  # 15 minutes
       api_key_env: "TWITTER_BEARER_TOKEN"
   
-  # WebSocket Real-time Sources (future enhancement)
+  # WebSocket Real-time Sources (ENABLED for fast trading)
   websocket_sources:
     - name: "Finnhub WebSocket"
       type: "websocket"
       url: "wss://ws.finnhub.io"
-      enabled: false  # Disabled until API key configured
+      enabled: true  # ENABLED for fast trading
       api_key_env: "FINNHUB_API_KEY"
     
     - name: "Alpaca Data WebSocket"
       type: "websocket"
       url: "wss://stream.data.alpaca.markets/v2/news"
-      enabled: false
+      enabled: true  # ENABLED for real-time news
       api_key_env: "ALPACA_API_KEY"
     
     - name: "Polygon.io WebSocket"
       type: "websocket"
       url: "wss://socket.polygon.io/news"
-      enabled: false
+      enabled: true  # ENABLED for fast trading
       api_key_env: "POLYGON_API_KEY"
 
 # Legacy News Scraper Configuration (for backward compatibility)
@@ -531,6 +531,140 @@ trade_manager:
   trade_timeout_hours: 24           # Cancel trades after 24 hours
   max_retries: 3                    # Maximum retry attempts for failed orders
   enable_dynamic_adjustments: true  # Enable stop-loss/take-profit adjustments
+
+# Fast Trading System Configuration - HIGH-SPEED MOMENTUM TRADING
+fast_trading:
+  enabled: true                     # Enable fast trading capabilities
+  
+  # Momentum Pattern Detector Configuration
+  momentum_pattern_detector:
+    enabled: true                   # Enable pattern detection
+    scan_interval: 10               # Pattern scan every 10 seconds
+    lookback_minutes: 15            # Look back 15 minutes for patterns
+    min_confidence: 0.6             # Minimum pattern confidence
+    max_concurrent_patterns: 50     # Max patterns to track
+    
+    # Pattern-specific volatility thresholds
+    volatility_thresholds:
+      flash_crash: 0.05             # 5% minimum for flash crash
+      flash_surge: 0.05             # 5% minimum for flash surge
+      earnings_surprise: 0.03       # 3% minimum for earnings
+      regulatory_shock: 0.08        # 8% minimum for regulatory events
+      volume_breakout: 0.02         # 2% minimum with volume
+      momentum_continuation: 0.015  # 1.5% with trend
+      reversal_pattern: 0.04        # 4% minimum reversal
+      news_velocity_spike: 0.025    # 2.5% with news velocity
+      
+    # Monitored symbols for pattern detection
+    watchlist:
+      # High-volume stocks
+      - "SPY"
+      - "QQQ"
+      - "IWM"
+      - "AAPL"
+      - "MSFT"
+      - "GOOGL"
+      - "AMZN"
+      - "TSLA"
+      - "NVDA"
+      - "META"
+      - "NFLX"
+      - "AMD"
+      # High-volatility stocks
+      - "GME"
+      - "AMC"
+      - "BBBY"
+      - "PLTR"
+      - "COIN"
+      - "HOOD"
+      # Crypto pairs
+      - "BTCUSD"
+      - "ETHUSD"
+      - "DOGEUSD"
+      - "SOLUSD"
+      - "AVAXUSD"
+  
+  # Breaking News Velocity Tracker Configuration
+  breaking_news_velocity_tracker:
+    enabled: true                   # Enable velocity tracking
+    update_interval: 30             # Check every 30 seconds
+    velocity_window_minutes: 10     # 10-minute velocity window
+    min_velocity_score: 2.0         # Minimum score for trading signal
+    story_expiry_hours: 4           # Stories expire after 4 hours
+    
+    # Velocity level thresholds
+    velocity_thresholds:
+      viral: 8.0                    # Viral velocity (lightning lane)
+      breaking: 5.0                 # Breaking velocity (express lane)
+      trending: 2.5                 # Trending velocity (fast lane)
+      normal: 1.0                   # Normal velocity (standard lane)
+    
+    # Breaking news keywords for rapid detection
+    breaking_keywords:
+      - "BREAKING:"
+      - "JUST IN:"
+      - "URGENT:"
+      - "ALERT:"
+      - "crashes"
+      - "surges"
+      - "halted"
+      - "earnings beat"
+      - "earnings miss"
+      - "FDA approval"
+      - "merger"
+      - "acquisition"
+    
+    # Hype indicators for momentum trading
+    hype_indicators:
+      - "viral"
+      - "trending"
+      - "to the moon"
+      - "diamond hands"
+      - "squeeze"
+      - "breakout"
+      - "all-time high"
+  
+  # Express Execution Manager Configuration
+  express_execution_manager:
+    enabled: true                   # Enable express execution
+    max_concurrent_trades: 10       # Max concurrent express trades
+    enable_lightning_lane: true     # Enable <5s lightning trades
+    enable_express_lane: true       # Enable <15s express trades
+    enable_fast_lane: true          # Enable <30s fast trades
+    
+    # Speed targets (milliseconds)
+    speed_targets:
+      lightning: 5000               # 5 seconds for flash events
+      express: 15000                # 15 seconds for breaking news
+      fast: 30000                   # 30 seconds for patterns
+      standard: 60000               # 60 seconds for normal
+      
+    # Lane-specific configurations
+    lane_configs:
+      lightning:
+        skip_validation: true       # Skip validation for speed
+        pre_compute_prices: true    # Pre-calculate protective prices
+        use_market_orders: true     # Market orders for speed
+        max_position_size: 0.02     # 2% max for high-risk speed trades
+      express:
+        skip_validation: false      # Basic validation
+        pre_compute_prices: true
+        use_market_orders: true
+        max_position_size: 0.03     # 3% max
+      fast:
+        skip_validation: false      # Full validation
+        pre_compute_prices: false
+        use_market_orders: false
+        max_position_size: 0.05     # 5% max
+      standard:
+        skip_validation: false
+        pre_compute_prices: false
+        use_market_orders: false
+        max_position_size: 0.05     # 5% max
+    
+    # Speed optimizations
+    cache_expiry_seconds: 5         # 5-second price cache
+    max_cached_prices: 100          # Cache up to 100 symbols
 
 # Enhanced Trade Manager Configuration - NEW ARCHITECTURE
 enhanced_trade_manager:
