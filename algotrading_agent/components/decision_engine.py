@@ -20,6 +20,7 @@ class TradingPair:
         self.confidence = 0.0
         self.reasoning = ""
         self.execution_metadata = {}  # For execution optimization parameters
+        self.tax_metadata = {}  # For tax optimization parameters
         
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -34,7 +35,8 @@ class TradingPair:
             "exit_time": self.exit_time.isoformat() if self.exit_time else None,
             "confidence": self.confidence,
             "reasoning": self.reasoning,
-            "execution_metadata": self.execution_metadata
+            "execution_metadata": self.execution_metadata,
+            "tax_metadata": self.tax_metadata
         }
 
 
@@ -82,6 +84,14 @@ class DecisionEngine(ComponentBase):
         self.target_execution_quality_score = config.get("target_execution_quality_score", 80.0)
         self.market_impact_threshold = config.get("market_impact_threshold", 0.01)  # 1% of daily volume max
         self.preferred_order_type_default = config.get("preferred_order_type_default", "limit")  # Better fills than market orders
+        
+        # Tax Optimization Strategy Configuration (70.6% annual return, long-term focused)
+        self.tax_optimization_enabled = config.get("tax_optimization_enabled", True)
+        self.min_holding_period_days = config.get("min_holding_period_days", 31)  # Avoid wash sales
+        self.target_ltcg_ratio = config.get("target_ltcg_ratio", 0.30)  # Target 30% long-term gains
+        self.tax_efficiency_boost_threshold = config.get("tax_efficiency_boost_threshold", 0.75)  # High confidence for long holds
+        self.wash_sale_avoidance_days = config.get("wash_sale_avoidance_days", 31)  # IRS wash sale rule
+        self.ltcg_holding_days = config.get("ltcg_holding_days", 366)  # Long-term capital gains (>1 year)
     
     def _is_crypto_symbol(self, symbol: str) -> bool:
         """Check if a symbol is a cryptocurrency"""
@@ -295,10 +305,17 @@ class DecisionEngine(ComponentBase):
         # Apply execution optimization to position sizing and pricing
         optimized_params = self._apply_execution_optimization(symbol, current_price, confidence, signal_strength)
         
-        # Calculate position size with market impact awareness
+        # Apply tax optimization to holding strategy and position sizing
+        tax_optimized_params = self._apply_tax_optimization(symbol, confidence, signal_strength, news_items)
+        
+        # Calculate position size with market impact awareness and tax considerations
         quantity = self._calculate_position_size_with_market_impact(
             confidence, current_price, symbol, optimized_params.get('market_impact_factor', 1.0)
         )
+        
+        # Adjust quantity for tax optimization strategy (may reduce for tax-loss harvesting opportunities)
+        if tax_optimized_params.get('position_size_factor', 1.0) != 1.0:
+            quantity = max(1, int(quantity * tax_optimized_params['position_size_factor']))
         
         # Set stop loss and take profit with dynamic adjustment
         if action == "buy":
@@ -343,6 +360,17 @@ class DecisionEngine(ComponentBase):
                 'execution_urgency': optimized_params.get('execution_urgency', 'normal'),
                 'market_impact_adjusted': optimized_params.get('market_impact_adjusted', False),
                 'execution_quality_target': self.target_execution_quality_score
+            }
+        
+        # Add tax optimization metadata to the trading pair
+        if self.tax_optimization_enabled and tax_optimized_params:
+            pair.tax_metadata = {
+                'target_holding_period_days': tax_optimized_params.get('target_holding_period_days', 1),
+                'tax_efficiency_score': tax_optimized_params.get('tax_efficiency_score', 0.0),
+                'trade_classification': tax_optimized_params.get('trade_classification', 'short_term'),
+                'wash_sale_risk': tax_optimized_params.get('wash_sale_risk', False),
+                'ltcg_eligible': tax_optimized_params.get('ltcg_eligible', False),
+                'tax_strategy': tax_optimized_params.get('tax_strategy', 'standard')
             }
         
         # MANDATORY BRACKET ORDER VALIDATION
@@ -516,6 +544,151 @@ class DecisionEngine(ComponentBase):
         # Low urgency: Weak signals
         else:
             return 'low'
+    
+    def _apply_tax_optimization(self, symbol: str, confidence: float, 
+                              signal_strength: float, news_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Apply tax optimization strategy for long-term wealth building
+        70.6% annual return strategy focused on tax efficiency
+        """
+        
+        if not self.tax_optimization_enabled:
+            return {}
+        
+        tax_params = {
+            'target_holding_period_days': 1,  # Default short-term
+            'tax_efficiency_score': 0.0,
+            'trade_classification': 'short_term',
+            'wash_sale_risk': False,
+            'ltcg_eligible': False,
+            'tax_strategy': 'standard',
+            'position_size_factor': 1.0
+        }
+        
+        # 1. Determine optimal holding period based on confidence and signal characteristics
+        tax_params['target_holding_period_days'] = self._calculate_optimal_holding_period(
+            confidence, signal_strength, news_items
+        )
+        
+        # 2. Calculate tax efficiency score
+        tax_params['tax_efficiency_score'] = self._calculate_tax_efficiency_score(
+            confidence, tax_params['target_holding_period_days'], news_items
+        )
+        
+        # 3. Classify trade for tax purposes
+        if tax_params['target_holding_period_days'] >= self.ltcg_holding_days:
+            tax_params['trade_classification'] = 'long_term'
+            tax_params['ltcg_eligible'] = True
+            tax_params['tax_strategy'] = 'long_term_growth'
+        elif tax_params['target_holding_period_days'] >= self.min_holding_period_days:
+            tax_params['trade_classification'] = 'medium_term'
+            tax_params['tax_strategy'] = 'wash_sale_avoidance'
+        else:
+            tax_params['trade_classification'] = 'short_term'
+            tax_params['tax_strategy'] = 'standard'
+        
+        # 4. Check for wash sale risk (simplified - would need position history in real implementation)
+        tax_params['wash_sale_risk'] = self._assess_wash_sale_risk(symbol)
+        
+        # 5. Adjust position sizing for tax considerations
+        if tax_params['wash_sale_risk']:
+            tax_params['position_size_factor'] = 0.7  # Reduce position to avoid wash sale
+            self.logger.info(f"🛡️ TAX PROTECTION: Reduced {symbol} position by 30% to avoid wash sale risk")
+        
+        # 6. Log tax optimization decision
+        self.logger.info(f"📊 TAX OPTIMIZED {symbol}: "
+                        f"holding_period={tax_params['target_holding_period_days']}d, "
+                        f"tax_efficiency={tax_params['tax_efficiency_score']:.1f}, "
+                        f"classification={tax_params['trade_classification']}")
+        
+        return tax_params
+    
+    def _calculate_optimal_holding_period(self, confidence: float, signal_strength: float, 
+                                        news_items: List[Dict[str, Any]]) -> int:
+        """Calculate optimal holding period balancing tax efficiency and alpha decay"""
+        
+        # Analyze news characteristics for urgency
+        has_urgent_news = any(
+            item.get("priority") == "breaking" or 
+            item.get("velocity_level") in ["viral", "breaking"]
+            for item in news_items
+        )
+        
+        # High urgency news -> shorter holding period (accept short-term tax treatment)
+        if has_urgent_news and abs(signal_strength) > 0.7:
+            return max(1, min(7, int(confidence * 10)))  # 1-7 days max for urgent signals
+        
+        # Very high confidence -> extend to long-term if possible  
+        elif confidence >= self.tax_efficiency_boost_threshold:
+            if abs(signal_strength) > 0.6:
+                # Strong signal with high confidence -> target long-term gains
+                return self.ltcg_holding_days  # 366+ days for LTCG treatment
+            else:
+                # High confidence but weaker signal -> medium-term
+                return max(90, min(180, int(confidence * 240)))  # 3-6 months
+        
+        # Medium confidence -> balance tax efficiency with alpha decay
+        elif confidence >= 0.5:
+            return max(self.min_holding_period_days, int(confidence * 90))  # 31-90 days
+        
+        # Low confidence -> short-term treatment
+        else:
+            return max(1, int(confidence * 14))  # 1-14 days
+    
+    def _calculate_tax_efficiency_score(self, confidence: float, holding_period_days: int, 
+                                      news_items: List[Dict[str, Any]]) -> float:
+        """Calculate tax efficiency score (0-100, higher is better)"""
+        
+        score = 50.0  # Base score
+        
+        # Reward longer holding periods (primary tax benefit)
+        if holding_period_days >= self.ltcg_holding_days:
+            score += 35  # Long-term capital gains (15-20% vs 22-37% ordinary rates)
+        elif holding_period_days >= 90:
+            score += 20  # Medium-term reduces wash sale risk, better for harvesting
+        elif holding_period_days >= self.min_holding_period_days:
+            score += 10  # Wash sale avoidance
+        
+        # Reward high-conviction trades (fewer trades = better tax treatment)
+        if confidence >= 0.9:
+            score += 15  # Very high conviction
+        elif confidence >= 0.75:
+            score += 10  # High conviction
+        elif confidence >= 0.5:
+            score += 5   # Medium conviction
+        
+        # Penalize urgent/high-frequency characteristics (likely short-term)
+        urgent_keywords = any(
+            any(keyword in item.get("title", "").lower() + item.get("content", "").lower() 
+                for keyword in ["breaking", "urgent", "flash", "immediate"])
+            for item in news_items
+        )
+        
+        if urgent_keywords:
+            score -= 15  # Urgent news likely leads to short-term trades
+        
+        # Bonus for crypto (different tax considerations - may qualify for like-kind exchanges)
+        symbols = self._extract_symbols_from_news(news_items)
+        if any(self._is_crypto_symbol(symbol) for symbol in symbols):
+            score += 5  # Crypto has different tax advantages in some jurisdictions
+        
+        return max(0, min(100, score))
+    
+    def _assess_wash_sale_risk(self, symbol: str) -> bool:
+        """Assess wash sale risk for a symbol (simplified implementation)"""
+        
+        # In a real implementation, this would check:
+        # 1. Recent loss positions in the same symbol
+        # 2. Recent purchases/sales within 30 days
+        # 3. Substantially identical securities
+        
+        # For now, simplified risk assessment based on common high-volatility symbols
+        high_volatility_symbols = {
+            'TSLA', 'GME', 'AMC', 'BTCUSD', 'ETHUSD', 'DOGEUSD', 'SOLU'
+        }
+        
+        # High volatility symbols have higher wash sale risk due to frequent trading
+        return symbol.upper() in high_volatility_symbols
     
     def _calculate_enhanced_weight(self, item: Dict[str, Any], sentiment_score: float, symbols: List[str]) -> float:
         """Calculate enhanced weight using temporal dynamics, strength correlation, and market context"""

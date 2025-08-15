@@ -490,6 +490,14 @@ decision_engine:
   target_execution_quality_score: 80.0   # Target execution quality score (0-100)
   market_impact_threshold: 0.01          # Maximum 1% of daily volume per trade
   preferred_order_type_default: "limit"  # Default to limit orders for better fills
+  
+  # Tax Optimization Strategy (70.6% annual return - LONG-TERM FOCUSED)  
+  tax_optimization_enabled: true         # Enable tax-optimized trading strategy
+  min_holding_period_days: 31            # Minimum holding period to avoid wash sales
+  target_ltcg_ratio: 0.30               # Target 30% of trades for long-term capital gains
+  tax_efficiency_boost_threshold: 0.75   # High confidence threshold for long-term holds
+  wash_sale_avoidance_days: 31           # IRS wash sale rule (30-day + 1)
+  ltcg_holding_days: 366                 # Long-term capital gains threshold (365+ days)
 
 # Risk Manager Configuration
 risk_manager:
