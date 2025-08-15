@@ -23,6 +23,7 @@ class OptimizationStrategy(Enum):
     """Optimization strategy types"""
     EXECUTION_OPTIMIZED = "execution_optimized"
     TAX_OPTIMIZED = "tax_optimized"
+    FREQUENCY_OPTIMIZED = "frequency_optimized"
     HYBRID_OPTIMIZED = "hybrid_optimized"
     BASELINE = "baseline"
 

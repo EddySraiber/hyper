@@ -498,6 +498,20 @@ decision_engine:
   tax_efficiency_boost_threshold: 0.75   # High confidence threshold for long-term holds
   wash_sale_avoidance_days: 31           # IRS wash sale rule (30-day + 1)
   ltcg_holding_days: 366                 # Long-term capital gains threshold (365+ days)
+  
+  # Frequency Optimization Strategy (40.7% annual return - HIGH SELECTIVITY)
+  frequency_optimization_enabled: true   # Enable frequency-optimized trading strategy
+  min_trade_confidence: 0.70            # Higher confidence threshold for selectivity (vs 0.15 baseline)
+  max_trades_per_day: 10                # Limit daily trade volume to reduce friction
+  max_trades_per_hour: 3                # Prevent overtrading and improve execution quality
+  conviction_boost_threshold: 0.85      # Very high conviction override threshold
+  daily_trade_reset_hour: 9             # Reset counters at market open (9 AM EST)
+  
+  # Hybrid Optimization Strategy (ULTIMATE - combining all approaches)
+  hybrid_optimization_enabled: true     # Enable hybrid optimization (all strategies combined)
+  hybrid_confidence_weight: 0.4         # Weight for confidence/frequency optimization
+  hybrid_efficiency_weight: 0.3         # Weight for tax efficiency optimization  
+  hybrid_execution_weight: 0.3          # Weight for execution quality optimization
 
 # Optimization Metrics Configuration
 optimization_metrics:

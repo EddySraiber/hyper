@@ -785,12 +785,21 @@ class AlgotradingAgent:
     def _determine_optimization_strategy(self, pair) -> OptimizationStrategy:
         """Determine which optimization strategy was used for this trade"""
         
-        # Check if both execution and tax optimization are enabled
+        # Check which optimizations are applied
         has_execution_metadata = hasattr(pair, 'execution_metadata') and pair.execution_metadata
         has_tax_metadata = hasattr(pair, 'tax_metadata') and pair.tax_metadata
+        has_frequency_metadata = hasattr(pair, 'frequency_metadata') and pair.frequency_metadata
+        has_hybrid_metadata = hasattr(pair, 'hybrid_metadata') and pair.hybrid_metadata
         
-        if has_execution_metadata and has_tax_metadata:
-            # Both optimizations applied
+        # If hybrid metadata exists, it's always hybrid (combines all approaches)
+        if has_hybrid_metadata:
+            return OptimizationStrategy.HYBRID_OPTIMIZED
+        
+        # Count optimization types for non-hybrid classification
+        optimization_count = sum([has_execution_metadata, has_tax_metadata, has_frequency_metadata])
+        
+        if optimization_count >= 2:
+            # Multiple optimizations applied -> Hybrid
             return OptimizationStrategy.HYBRID_OPTIMIZED
         elif has_execution_metadata:
             # Only execution optimization
@@ -798,6 +807,9 @@ class AlgotradingAgent:
         elif has_tax_metadata:
             # Only tax optimization  
             return OptimizationStrategy.TAX_OPTIMIZED
+        elif has_frequency_metadata:
+            # Only frequency optimization
+            return OptimizationStrategy.FREQUENCY_OPTIMIZED
         else:
             # No optimization (baseline)
             return OptimizationStrategy.BASELINE
