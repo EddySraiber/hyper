@@ -764,11 +764,24 @@ class DecisionEngine(ComponentBase):
         # Reset counters if needed
         self._reset_frequency_counters()
         
-        # 1. Check confidence threshold (higher than base minimum)
-        if confidence < self.min_trade_confidence:
+        # 1. Check confidence threshold (higher than base minimum, but respect crypto thresholds)
+        is_crypto_symbol = self._is_crypto_symbol(symbol)
+        effective_min_confidence = self.crypto_minimum_confidence if is_crypto_symbol else self.min_confidence
+        
+        # For frequency optimization, use higher threshold but still respect crypto/stock distinction
+        if is_crypto_symbol:
+            # For crypto: use crypto threshold + frequency boost (but not as high as stock frequency threshold)
+            frequency_crypto_threshold = min(self.crypto_minimum_confidence + 0.20, 0.50)  # Max 0.50 for crypto
+            threshold_to_check = frequency_crypto_threshold
+        else:
+            # For stocks: use the full frequency optimization threshold
+            threshold_to_check = self.min_trade_confidence
+        
+        if confidence < threshold_to_check:
+            asset_type = "crypto" if is_crypto_symbol else "stock"
             return {
                 'should_trade': False, 
-                'reason': f'confidence {confidence:.2f} below selective threshold {self.min_trade_confidence:.2f}'
+                'reason': f'{asset_type} confidence {confidence:.2f} below selective threshold {threshold_to_check:.2f}'
             }
         
         # 2. Check daily trade limits
@@ -791,12 +804,17 @@ class DecisionEngine(ComponentBase):
             self.logger.info(f"🌟 HIGH CONVICTION: {symbol} confidence {confidence:.2f} >= {self.conviction_boost_threshold:.2f}")
             return {'should_trade': True, 'reason': 'high conviction override'}
         
-        # 5. Apply signal strength filtering
-        min_signal_strength = 0.5  # Require moderate signal strength
+        # 5. Apply signal strength filtering (crypto-aware)
+        if is_crypto_symbol:
+            min_signal_strength = 0.25  # Lower threshold for crypto (more volatile, less predictable)
+        else:
+            min_signal_strength = 0.5   # Higher threshold for stocks (more stable patterns)
+            
         if abs(signal_strength) < min_signal_strength:
+            asset_type = "crypto" if is_crypto_symbol else "stock"
             return {
                 'should_trade': False,
-                'reason': f'signal strength {abs(signal_strength):.2f} below minimum {min_signal_strength:.2f}'
+                'reason': f'{asset_type} signal strength {abs(signal_strength):.2f} below minimum {min_signal_strength:.2f}'
             }
         
         # Trade passes all frequency filters
