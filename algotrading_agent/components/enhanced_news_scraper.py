@@ -114,6 +114,20 @@ class EnhancedNewsScraper(ComponentBase):
             )
             sources.append(source)
             
+        # Real-time breaking news sources
+        realtime_sources = config.get("realtime_sources", [])
+        for source_config in realtime_sources:
+            source = NewsSource(
+                name=source_config["name"],
+                type="realtime",
+                url=source_config["url"],
+                enabled=source_config.get("enabled", True),
+                priority=source_config.get("priority", 1),
+                rate_limit=source_config.get("rate_limit", 30.0),
+                headers=source_config.get("headers", {})
+            )
+            sources.append(source)
+            
         # WebSocket streaming sources  
         ws_sources = config.get("websocket_sources", [])
         for source_config in ws_sources:
@@ -380,6 +394,11 @@ class EnhancedNewsScraper(ComponentBase):
                 elif source.type == "api":
                     return await self._scrape_api_enhanced(source)
                 elif source.type == "social":
+                    return await self._scrape_social_enhanced(source)
+                elif source.type == "realtime":
+                    return await self._scrape_realtime_enhanced(source)
+                elif source.type in ["reddit", "twitter"]:
+                    # Legacy support for specific social types
                     return await self._scrape_social_enhanced(source)
                 else:
                     self.logger.warning(f"Unknown source type: {source.type}")
@@ -862,6 +881,177 @@ class EnhancedNewsScraper(ComponentBase):
         except Exception as e:
             self.logger.error(f"Twitter scraping error for {source.name}: {e}")
             raise
+    
+    async def _scrape_realtime_enhanced(self, source: NewsSource) -> List[Dict[str, Any]]:
+        """Scrape real-time breaking news sources with enhanced processing"""
+        try:
+            # Real-time sources are typically RSS feeds or APIs with breaking news focus
+            headers = source.headers.copy() if source.headers else {}
+            headers.update({
+                "User-Agent": "Mozilla/5.0 (compatible; Financial-News-Bot/1.0)",
+                "Accept": "application/rss+xml, application/xml, text/xml, application/json, */*"
+            })
+            
+            async with self.session.get(source.url, headers=headers) as response:
+                if response.status != 200:
+                    raise aiohttp.ClientResponseError(
+                        response.request_info, 
+                        response.history,
+                        status=response.status,
+                        message=f"HTTP {response.status}"
+                    )
+                
+                content_type = response.headers.get('Content-Type', '').lower()
+                content = await response.text()
+                
+                articles = []
+                
+                if 'json' in content_type:
+                    # JSON API response
+                    articles = await self._parse_realtime_json(content, source)
+                elif any(xml_type in content_type for xml_type in ['xml', 'rss', 'atom']):
+                    # RSS/XML feed
+                    articles = await self._parse_realtime_rss(content, source)
+                else:
+                    # Try to parse as RSS first, then JSON
+                    try:
+                        articles = await self._parse_realtime_rss(content, source)
+                    except:
+                        try:
+                            articles = await self._parse_realtime_json(content, source)
+                        except:
+                            self.logger.warning(f"Could not parse content type {content_type} for {source.name}")
+                            return []
+                
+                # Apply breaking news priority boost
+                for article in articles:
+                    article['priority_boost'] = True
+                    article['breaking_news'] = True
+                    article['source_type'] = 'realtime'
+                    
+                    # Enhanced relevance scoring for real-time sources
+                    breaking_keywords = [
+                        'breaking', 'urgent', 'alert', 'just in', 'developing', 'flash',
+                        'market crash', 'surge', 'plunge', 'halted', 'circuit breaker'
+                    ]
+                    
+                    title_content = (article.get('title', '') + ' ' + article.get('content', '')).lower()
+                    breaking_score = sum(1 for keyword in breaking_keywords if keyword in title_content)
+                    article['breaking_score'] = breaking_score
+                    
+                    if breaking_score > 0:
+                        article['relevance_boost'] = 1.5 + (breaking_score * 0.2)
+                
+                source.failure_count = 0  # Reset failure count on success
+                self.logger.info(f"📰 Real-time: Scraped {len(articles)} breaking news items from {source.name}")
+                return articles[:30]  # Limit for performance
+                
+        except Exception as e:
+            self.logger.error(f"Real-time scraping error for {source.name}: {e}")
+            raise
+    
+    async def _parse_realtime_json(self, content: str, source: NewsSource) -> List[Dict[str, Any]]:
+        """Parse JSON content from real-time sources"""
+        try:
+            data = json.loads(content)
+            articles = []
+            
+            # Handle different JSON structures
+            if isinstance(data, dict):
+                if 'articles' in data:
+                    items = data['articles']
+                elif 'data' in data:
+                    items = data['data'] if isinstance(data['data'], list) else [data['data']]
+                elif 'results' in data:
+                    items = data['results']
+                elif 'items' in data:
+                    items = data['items']
+                else:
+                    items = [data]  # Single item
+            else:
+                items = data  # Assume it's a list
+            
+            for item in items[:50]:  # Limit processing
+                if isinstance(item, dict):
+                    article = {
+                        'title': item.get('title', item.get('headline', item.get('summary', ''))),
+                        'content': item.get('content', item.get('description', item.get('text', ''))),
+                        'url': item.get('url', item.get('link', item.get('permalink', ''))),
+                        'published': self._parse_timestamp(item.get('published', item.get('publishedAt', item.get('created_utc')))),
+                        'source': source.name,
+                        'author': item.get('author', item.get('by', '')),
+                        'symbols': self._extract_symbols_from_text(
+                            str(item.get('title', '')) + ' ' + str(item.get('content', ''))
+                        )
+                    }
+                    
+                    if article['title'] and article['title'].strip():
+                        articles.append(article)
+            
+            return articles
+            
+        except json.JSONDecodeError as e:
+            self.logger.error(f"JSON parsing error for {source.name}: {e}")
+            return []
+    
+    async def _parse_realtime_rss(self, content: str, source: NewsSource) -> List[Dict[str, Any]]:
+        """Parse RSS/XML content from real-time sources"""
+        try:
+            # Use feedparser for RSS/Atom feeds
+            feed = feedparser.parse(content)
+            articles = []
+            
+            for entry in feed.entries[:50]:  # Limit processing
+                article = {
+                    'title': getattr(entry, 'title', ''),
+                    'content': getattr(entry, 'summary', getattr(entry, 'description', '')),
+                    'url': getattr(entry, 'link', ''),
+                    'published': self._parse_feedparser_timestamp(getattr(entry, 'published_parsed', None)),
+                    'source': source.name,
+                    'author': getattr(entry, 'author', ''),
+                    'symbols': self._extract_symbols_from_text(
+                        getattr(entry, 'title', '') + ' ' + getattr(entry, 'summary', '')
+                    )
+                }
+                
+                if article['title'] and article['title'].strip():
+                    articles.append(article)
+            
+            return articles
+            
+        except Exception as e:
+            self.logger.error(f"RSS parsing error for {source.name}: {e}")
+            return []
+    
+    def _parse_feedparser_timestamp(self, timestamp_tuple) -> datetime:
+        """Parse feedparser timestamp tuple"""
+        if timestamp_tuple:
+            try:
+                import time
+                return datetime.fromtimestamp(time.mktime(timestamp_tuple))
+            except (TypeError, ValueError, OverflowError):
+                pass
+        return datetime.utcnow()
+    
+    def _extract_symbols_from_text(self, text: str) -> List[str]:
+        """Extract stock symbols from text using regex patterns"""
+        if not text:
+            return []
+        
+        import re
+        # Look for $SYMBOL pattern and standalone ticker patterns
+        dollar_symbols = re.findall(r'\$([A-Z]{1,5})\b', text.upper())
+        word_symbols = re.findall(r'\b([A-Z]{2,5})\b', text.upper())
+        
+        # Common financial symbols to include
+        financial_symbols = {'SPY', 'QQQ', 'IWM', 'VIX', 'TSLA', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA'}
+        
+        # Combine and filter symbols
+        all_symbols = set(dollar_symbols + word_symbols)
+        filtered_symbols = [symbol for symbol in all_symbols 
+                          if len(symbol) >= 2 and (symbol in financial_symbols or len(symbol) <= 5)]
+        
+        return list(set(filtered_symbols))[:10]  # Limit to 10 symbols max
     
     async def _extract_full_content(self, url: str) -> Optional[str]:
         """Extract full article content from URL"""
