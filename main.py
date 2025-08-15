@@ -30,6 +30,7 @@ from algotrading_agent.observability.schemas.live_metrics import ComponentStatus
 from algotrading_agent.observability.alert_manager import AlertManager
 from algotrading_agent.observability.log_aggregator import LogAggregator, StructuredLogHandler
 from algotrading_agent.observability.alpaca_sync import AlpacaSyncService
+from algotrading_agent.observability.optimization_metrics import OptimizationMetricsCollector, OptimizationStrategy
 
 
 class DashboardLogHandler(logging.Handler):
@@ -80,6 +81,9 @@ class AlgotradingAgent:
         self.statistical_advisor = StatisticalAdvisor(self.config.get_component_config('statistical_advisor'))
         # Enhanced trade management system
         self.trade_manager = EnhancedTradeManager(self.config.get_component_config('trade_manager'))
+        
+        # Optimization metrics collector
+        self.optimization_metrics = OptimizationMetricsCollector(self.config.get_component_config('optimization_metrics'))
         
         # Initialize safety components (will be connected after Alpaca client is ready)
         self.position_protector = None
@@ -277,6 +281,10 @@ class AlgotradingAgent:
                     self.logger.info("Continuing in SIMULATION MODE - no real trading")
                     self.alpaca_client = None  # Fall back to simulation
                     self.alpaca_sync = None
+            
+            # Start optimization metrics collector
+            await self.optimization_metrics.start()
+            self.logger.info("🔍 Optimization metrics collector started")
                 
             self.logger.info("All components started successfully")
             
@@ -315,6 +323,9 @@ class AlgotradingAgent:
         await self.log_aggregator.stop()
         if self._structured_handler:
             logging.getLogger().removeHandler(self._structured_handler)
+        
+        # Stop optimization metrics collector
+        await self.optimization_metrics.stop()
         
         # Stop observability service
         await self.observability.stop()
@@ -506,6 +517,13 @@ class AlgotradingAgent:
             # Add to trade queue
             if self.trade_manager.add_trade(pair):
                 queued_count += 1
+                
+                # Track trade with optimization metrics collector
+                strategy = self._determine_optimization_strategy(pair)
+                trade_id = self.optimization_metrics.track_trade_start(pair.to_dict(), strategy)
+                
+                # Store trade_id in pair for future reference
+                pair.optimization_trade_id = trade_id
                 
                 # If we have Alpaca client, immediately execute the entry order
                 if self.alpaca_client:
@@ -763,6 +781,26 @@ class AlgotradingAgent:
             'trade_queue': trade_queue_status,
             'timestamp': datetime.utcnow().isoformat()
         }
+
+    def _determine_optimization_strategy(self, pair) -> OptimizationStrategy:
+        """Determine which optimization strategy was used for this trade"""
+        
+        # Check if both execution and tax optimization are enabled
+        has_execution_metadata = hasattr(pair, 'execution_metadata') and pair.execution_metadata
+        has_tax_metadata = hasattr(pair, 'tax_metadata') and pair.tax_metadata
+        
+        if has_execution_metadata and has_tax_metadata:
+            # Both optimizations applied
+            return OptimizationStrategy.HYBRID_OPTIMIZED
+        elif has_execution_metadata:
+            # Only execution optimization
+            return OptimizationStrategy.EXECUTION_OPTIMIZED
+        elif has_tax_metadata:
+            # Only tax optimization  
+            return OptimizationStrategy.TAX_OPTIMIZED
+        else:
+            # No optimization (baseline)
+            return OptimizationStrategy.BASELINE
 
 
 async def main():

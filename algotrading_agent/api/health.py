@@ -37,6 +37,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._serve_performance()
         elif path == '/api/system-health':
             self._serve_system_health()
+        elif path == '/api/optimization':
+            self._serve_optimization_metrics()
         elif path == '/api/alerts':
             self._serve_alerts()
         elif path == '/api/alerts/active':
@@ -624,6 +626,40 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._send_json(health_data)
         except Exception as e:
             self._send_error(500, f"Error getting system health: {str(e)}")
+    
+    def _serve_optimization_metrics(self):
+        """Serve optimization metrics and performance data"""
+        try:
+            optimization_data = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "optimization_tracking": "enabled",
+                "strategies": {},
+                "active_trades": 0,
+                "dashboard_data": {}
+            }
+            
+            if self.agent and hasattr(self.agent, 'optimization_metrics'):
+                dashboard_data = self.agent.optimization_metrics.get_optimization_dashboard_data()
+                optimization_data.update(dashboard_data)
+                
+                # Add strategy-specific performance
+                from algotrading_agent.observability.optimization_metrics import OptimizationStrategy
+                for strategy in OptimizationStrategy:
+                    report = self.agent.optimization_metrics.generate_strategy_report(strategy, days_back=7)
+                    optimization_data["strategies"][strategy.value] = {
+                        "total_trades": report.total_trades,
+                        "win_rate": f"{report.win_rate:.1%}",
+                        "total_return_pct": f"{report.total_return_pct:.2f}%",
+                        "annualized_return_pct": f"{report.annualized_return_pct:.2f}%",
+                        "avg_execution_quality": f"{report.avg_execution_quality:.1f}/100",
+                        "avg_tax_efficiency": f"{report.avg_tax_efficiency:.1f}/100",
+                        "avg_holding_period_days": f"{report.avg_holding_period_days:.1f}",
+                        "outperformance_vs_baseline": f"{report.outperformance_vs_baseline:.2f}%"
+                    }
+            
+            self._send_json(optimization_data)
+        except Exception as e:
+            self._send_error(500, f"Error getting optimization metrics: {str(e)}")
     
     def _serve_alerts(self):
         """Serve all alerts"""

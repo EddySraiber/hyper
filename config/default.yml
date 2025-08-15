@@ -499,6 +499,13 @@ decision_engine:
   wash_sale_avoidance_days: 31           # IRS wash sale rule (30-day + 1)
   ltcg_holding_days: 366                 # Long-term capital gains threshold (365+ days)
 
+# Optimization Metrics Configuration
+optimization_metrics:
+  performance_window_days: 30             # Performance tracking window
+  metrics_update_interval: 60             # Update interval in seconds  
+  enable_detailed_tracking: true          # Enable detailed execution and tax tracking
+  export_performance_data: true           # Enable performance data export
+
 # Risk Manager Configuration
 risk_manager:
   max_portfolio_value: 100000     # $100k virtual money
