@@ -65,6 +65,22 @@ class DecisionEngine(ComponentBase):
         self.crypto_social_weight = config.get("crypto_social_weight", 0.6)
         self.crypto_24_7_trading = config.get("crypto_24_7_trading", True)
         
+        # Market regime detection configuration
+        self.regime_detection_enabled = config.get("regime_detection_enabled", True)
+        self.market_regime_detector = None
+        if self.regime_detection_enabled:
+            from algotrading_agent.components.market_regime_detector import MarketRegimeDetector
+            regime_config = config.get("market_regime_detector", {})
+            self.market_regime_detector = MarketRegimeDetector(regime_config)
+        
+        # Options flow analysis configuration
+        self.options_flow_enabled = config.get("options_flow_enabled", True)
+        self.options_flow_analyzer = None
+        if self.options_flow_enabled:
+            from algotrading_agent.components.options_flow_analyzer import OptionsFlowAnalyzer
+            options_config = config.get("options_flow_analyzer", {})
+            self.options_flow_analyzer = OptionsFlowAnalyzer(options_config)
+        
         # Supported crypto symbols for detection
         self.crypto_symbols = {
             'BTCUSD', 'ETHUSD', 'LTCUSD', 'DOGEUSD', 'SOLUSD', 'AVAXUSD', 
@@ -183,9 +199,29 @@ class DecisionEngine(ComponentBase):
         self.logger.info("Starting Decision Engine")
         self.is_running = True
         
+        # Start market regime detector if enabled
+        if self.market_regime_detector:
+            self.market_regime_detector.start()
+            self.logger.info("✅ Market Regime Detector started")
+        
+        # Start options flow analyzer if enabled
+        if self.options_flow_analyzer:
+            self.options_flow_analyzer.start()
+            self.logger.info("✅ Options Flow Analyzer started")
+        
     def stop(self) -> None:
         self.logger.info("Stopping Decision Engine")
         self.is_running = False
+        
+        # Stop market regime detector
+        if self.market_regime_detector:
+            self.market_regime_detector.stop()
+            self.logger.info("⏹️ Market Regime Detector stopped")
+        
+        # Stop options flow analyzer
+        if self.options_flow_analyzer:
+            self.options_flow_analyzer.stop()
+            self.logger.info("⏹️ Options Flow Analyzer stopped")
         
     async def process(self, analyzed_news: List[Dict[str, Any]], 
                       market_data: Optional[Dict[str, Any]] = None) -> List[TradingPair]:
@@ -219,6 +255,52 @@ class DecisionEngine(ComponentBase):
             self.logger.info("📈 Stock market open - stock trading only")
         elif crypto_market_open:
             self.logger.info("₿ Crypto markets open - crypto trading only (24/7)")
+        
+        # MARKET REGIME DETECTION: Analyze current market conditions
+        regime_adjustments = {}
+        if self.market_regime_detector:
+            try:
+                # Prepare market data for regime detection
+                regime_market_data = market_data or {}
+                regime_market_data.update({
+                    'average_sentiment': sum(item.get('sentiment', {}).get('polarity', 0) for item in analyzed_news) / len(analyzed_news),
+                    'news_count': len(analyzed_news),
+                    'current_price': 100.0,  # Default, will be updated per symbol
+                    'volume': 1000000  # Default volume
+                })
+                
+                # Detect current regime
+                regime_signal = await self.market_regime_detector.detect_regime(regime_market_data)
+                
+                if regime_signal:
+                    regime_adjustments = self.market_regime_detector.get_regime_adjustments()
+                    self.logger.info(f"🎯 MARKET REGIME: {regime_signal.regime.value} "
+                                   f"(confidence: {regime_signal.confidence:.2f}) - "
+                                   f"Adjusting strategy parameters")
+                else:
+                    self.logger.debug("No clear market regime detected - using default parameters")
+                    
+            except Exception as e:
+                self.logger.error(f"Error in market regime detection: {e}")
+        
+        # OPTIONS FLOW ANALYSIS: Get unusual options activity signals
+        options_signals = {}
+        if self.options_flow_analyzer:
+            try:
+                options_flows = await self.options_flow_analyzer.process(market_data)
+                
+                # Organize options flows by symbol for easy lookup
+                for flow in options_flows:
+                    if flow.symbol not in options_signals:
+                        options_signals[flow.symbol] = []
+                    options_signals[flow.symbol].append(flow)
+                
+                if options_flows:
+                    self.logger.info(f"📊 OPTIONS FLOW: {len(options_flows)} signals detected across "
+                                   f"{len(options_signals)} symbols")
+                    
+            except Exception as e:
+                self.logger.error(f"Error in options flow analysis: {e}")
             
         trading_pairs = []
         
@@ -237,7 +319,10 @@ class DecisionEngine(ComponentBase):
                     self.logger.info(f"⏭️  Skipping {symbol} - already have position or pending order")
                     continue
                     
-                decision = await self._make_decision(symbol, news_items, market_data)
+                # Get options flow signals for this symbol
+                symbol_options_flows = options_signals.get(symbol, [])
+                
+                decision = await self._make_decision(symbol, news_items, market_data, regime_adjustments, symbol_options_flows)
                 if decision:
                     trading_pairs.append(decision)
             except Exception as e:
@@ -296,7 +381,9 @@ class DecisionEngine(ComponentBase):
         return []
         
     async def _make_decision(self, symbol: str, news_items: List[Dict[str, Any]], 
-                            market_data: Optional[Dict[str, Any]] = None) -> Optional[TradingPair]:
+                            market_data: Optional[Dict[str, Any]] = None,
+                            regime_adjustments: Optional[Dict[str, Any]] = None,
+                            options_flows: Optional[List] = None) -> Optional[TradingPair]:
         
         # Calculate aggregate signals
         signal_strength = self._calculate_signal_strength(news_items)
@@ -308,6 +395,47 @@ class DecisionEngine(ComponentBase):
         
         # Use crypto-specific confidence threshold if applicable
         effective_min_confidence = self.crypto_minimum_confidence if is_crypto_related else self.min_confidence
+        
+        # Apply market regime adjustments to confidence threshold
+        if regime_adjustments:
+            confidence_adjustment = regime_adjustments.get('confidence_threshold_adjustment', 0.0)
+            effective_min_confidence += confidence_adjustment
+            
+            if confidence_adjustment != 0:
+                self.logger.debug(f"🎯 REGIME ADJUSTMENT: Confidence threshold {confidence_adjustment:+.3f} "
+                                f"(new threshold: {effective_min_confidence:.3f})")
+        
+        # ENHANCE WITH OPTIONS FLOW: Adjust confidence and signal strength based on options activity
+        options_boost = 0.0
+        options_signal_direction = 0
+        
+        if options_flows:
+            # Analyze options flow signals for this symbol
+            bullish_flows = [f for f in options_flows if 'bullish' in f.signal_type.value or 'call' in f.signal_type.value]
+            bearish_flows = [f for f in options_flows if 'bearish' in f.signal_type.value or 'put' in f.signal_type.value]
+            
+            # Calculate weighted options signal
+            bullish_weight = sum(f.strength * f.confidence for f in bullish_flows)
+            bearish_weight = sum(f.strength * f.confidence for f in bearish_flows)
+            
+            if bullish_weight > bearish_weight:
+                options_signal_direction = 1  # Bullish
+                options_boost = min(0.15, (bullish_weight - bearish_weight) * 0.1)  # Max 15% boost
+            elif bearish_weight > bullish_weight:
+                options_signal_direction = -1  # Bearish
+                options_boost = min(0.15, (bearish_weight - bullish_weight) * 0.1)
+            
+            # Apply options flow boost to confidence
+            if options_boost > 0:
+                confidence += options_boost
+                self.logger.debug(f"📊 OPTIONS BOOST: {symbol} confidence +{options_boost:.3f} "
+                                f"({'bullish' if options_signal_direction > 0 else 'bearish'} flow)")
+                
+                # Log significant options activity
+                for flow in options_flows:
+                    if flow.confidence > 0.6:
+                        self.logger.info(f"🎯 SIGNIFICANT OPTIONS: {symbol} {flow.signal_type.value} "
+                                       f"(strength: {flow.strength:.2f}, premium: ${flow.premium_value:,.0f})")
         
         if confidence < effective_min_confidence:
             asset_type = "crypto" if is_crypto_related else "stock"
@@ -357,6 +485,16 @@ class DecisionEngine(ComponentBase):
         # Adjust quantity for tax optimization strategy (may reduce for tax-loss harvesting opportunities)
         if tax_optimized_params.get('position_size_factor', 1.0) != 1.0:
             quantity = max(1, int(quantity * tax_optimized_params['position_size_factor']))
+        
+        # Apply market regime position size adjustments
+        if regime_adjustments:
+            position_multiplier = regime_adjustments.get('position_size_multiplier', 1.0)
+            original_quantity = quantity
+            quantity = max(1, int(quantity * position_multiplier))
+            
+            if position_multiplier != 1.0:
+                self.logger.debug(f"🎯 REGIME POSITION SIZING: {original_quantity} → {quantity} "
+                                f"(×{position_multiplier:.2f} regime adjustment)")
         
         # Set stop loss and take profit with dynamic adjustment
         if action == "buy":

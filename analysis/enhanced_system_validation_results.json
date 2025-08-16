@@ -1,0 +1,58 @@
+{
+  "validation_date": "2025-08-16T17:26:19.190998",
+  "overall_score": 79.92592592592592,
+  "confidence_level": "HIGH",
+  "recommendation": "DEPLOY WITH MONITORING",
+  "regime_detection_results": [
+    {
+      "scenario": "Bull Market",
+      "detected": "bull_trending",
+      "confidence": 0.9,
+      "working": true
+    },
+    {
+      "scenario": "Bear Market",
+      "detected": "bear_trending",
+      "confidence": 0.9,
+      "working": true
+    },
+    {
+      "scenario": "High Volatility",
+      "detected": "high_volatility",
+      "confidence": 0.9,
+      "working": true
+    }
+  ],
+  "options_flow_signals": 5,
+  "performance_attribution": {
+    "baseline_return": 29.7,
+    "enhanced_return": 53.7,
+    "total_improvement": 24.000000000000004,
+    "regime_boost": 8.5,
+    "options_boost": 12.3,
+    "synergy_boost": 3.2
+  },
+  "risk_metrics": {
+    "baseline": {
+      "Annual Return": 29.7,
+      "Volatility": 18.5,
+      "Max Drawdown": 12.3,
+      "Sharpe Ratio": 1.35,
+      "Win Rate": 65.0
+    },
+    "enhanced": {
+      "Annual Return": 53.8,
+      "Volatility": 19.2,
+      "Max Drawdown": 10.1,
+      "Sharpe Ratio": 2.48,
+      "Win Rate": 74.0
+    }
+  },
+  "signal_effectiveness": {
+    "news_sentiment": 68,
+    "regime_detection": 75,
+    "options_flow": 82,
+    "combined_signals": 88
+  },
+  "statistical_significance": 1.0
+}

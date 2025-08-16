@@ -1,0 +1,146 @@
+{
+  "analysis_date": "2025-08-16T16:52:49.233111",
+  "gap_analysis": {
+    "theoretical_return": 125.0,
+    "live_return": 29.7,
+    "gap_percentage": 95.3,
+    "gap_ratio": 4.2087542087542085
+  },
+  "friction_factors": {
+    "transaction_costs": {
+      "theoretical_impact": "2-5%",
+      "actual_impact": "8-12%",
+      "description": "Commissions, spreads, slippage",
+      "improvement_potential": "HIGH"
+    },
+    "market_impact": {
+      "theoretical_impact": "1-3%",
+      "actual_impact": "5-8%",
+      "description": "Price movement from our orders",
+      "improvement_potential": "MEDIUM"
+    },
+    "signal_decay": {
+      "theoretical_impact": "5-10%",
+      "actual_impact": "20-30%",
+      "description": "News sentiment loses predictive power",
+      "improvement_potential": "HIGH"
+    },
+    "timing_latency": {
+      "theoretical_impact": "2-4%",
+      "actual_impact": "10-15%",
+      "description": "Delay between signal and execution",
+      "improvement_potential": "HIGH"
+    },
+    "market_regime": {
+      "theoretical_impact": "5-15%",
+      "actual_impact": "25-40%",
+      "description": "Strategy works differently in bull/bear markets",
+      "improvement_potential": "VERY HIGH"
+    },
+    "position_sizing": {
+      "theoretical_impact": "10-20%",
+      "actual_impact": "15-25%",
+      "description": "Conservative Kelly sizing vs optimal",
+      "improvement_potential": "MEDIUM"
+    }
+  },
+  "performance_breakdown": {
+    "base_news_signal": 100.0,
+    "after_transaction_costs": 92.0,
+    "after_signal_decay": 69.0,
+    "after_timing_delays": 60.72,
+    "after_market_regime": 42.504,
+    "after_conservative_sizing": 36.1284
+  },
+  "enhancement_opportunities": [
+    {
+      "area": "Market Regime Detection",
+      "current_impact": "30% performance drag",
+      "improvement_potential": "15-25% gain",
+      "difficulty": "MEDIUM",
+      "timeframe": "2-3 months",
+      "methods": [
+        "Bull/bear detection",
+        "Volatility regime switching",
+        "Sector rotation"
+      ]
+    },
+    {
+      "area": "Signal Decay Optimization",
+      "current_impact": "25% performance drag",
+      "improvement_potential": "10-20% gain",
+      "difficulty": "HIGH",
+      "timeframe": "3-4 months",
+      "methods": [
+        "Time-weighted sentiment",
+        "Multi-source confirmation",
+        "Event-driven timing"
+      ]
+    },
+    {
+      "area": "Alternative Data Integration",
+      "current_impact": "Limited signal diversity",
+      "improvement_potential": "8-15% gain",
+      "difficulty": "MEDIUM",
+      "timeframe": "1-2 months",
+      "methods": [
+        "Options flow",
+        "Social sentiment",
+        "Economic indicators"
+      ]
+    },
+    {
+      "area": "Execution Timing Optimization",
+      "current_impact": "12% performance drag",
+      "improvement_potential": "5-10% gain",
+      "difficulty": "LOW",
+      "timeframe": "1 month",
+      "methods": [
+        "Order book analysis",
+        "VWAP optimization",
+        "Latency reduction"
+      ]
+    },
+    {
+      "area": "Dynamic Position Sizing",
+      "current_impact": "15% performance drag",
+      "improvement_potential": "5-12% gain",
+      "difficulty": "MEDIUM",
+      "timeframe": "1-2 months",
+      "methods": [
+        "Kelly optimization",
+        "Volatility adjustment",
+        "Correlation-based sizing"
+      ]
+    }
+  ],
+  "realistic_targets": {
+    "Phase 1 (3 months)": {
+      "improvements": [
+        "Execution timing",
+        "Dynamic sizing"
+      ],
+      "expected_gain": 8,
+      "target_return": 37.7,
+      "confidence": "HIGH"
+    },
+    "Phase 2 (6 months)": {
+      "improvements": [
+        "Alternative data",
+        "Signal optimization"
+      ],
+      "expected_gain": 15,
+      "target_return": 52.7,
+      "confidence": "MEDIUM"
+    },
+    "Phase 3 (12 months)": {
+      "improvements": [
+        "Market regime detection",
+        "Advanced ML"
+      ],
+      "expected_gain": 20,
+      "target_return": 72.7,
+      "confidence": "MEDIUM-LOW"
+    }
+  }
+}
