@@ -719,8 +719,10 @@ news_analysis_brain:
   
   # Sentiment Analysis Method Configuration
   sentiment_analysis:
-    primary_method: "ml"              # Primary method: "ml", "ai", or "traditional"
+    primary_method: "ai"              # Primary method: "ml", "ai", or "traditional" - FIXED: Now using AI
     fallback_enabled: true            # Enable fallback to traditional if primary fails
+    ai_weight: 0.7                    # Weight for AI analysis (70% AI + 30% traditional)
+    traditional_weight: 0.3           # Weight for traditional TextBlob analysis
     
     # ML Sentiment Analysis Configuration
     ml_enabled: true                  # Enable ML-based sentiment analysis
@@ -769,7 +771,7 @@ ai_analyzer:
   enabled: true                     # Set to true to enable AI analysis
   
   # Primary AI Provider Selection (choose one)
-  provider: "openai"                # Current active provider
+  provider: "groq"                  # Primary provider (free, fast LLaMA-3)
   
   # Provider-specific configurations
   providers:

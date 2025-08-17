@@ -29,9 +29,10 @@ class NewsAnalysisBrain(ComponentBase):
         
         # Initialize AI analyzer if enabled (keeping existing functionality)
         ai_config = config.get("ai_analyzer", {})
-        self.ai_enabled = ai_config.get("enabled", False)
-        self.ai_weight = self.analyzer_config.get("ai_weight", 0.3)
-        self.traditional_weight = self.analyzer_config.get("traditional_weight", 0.1)
+        # Enable AI if primary method is "ai" OR if explicitly enabled in ai_analyzer config
+        self.ai_enabled = (self.primary_method == "ai") or ai_config.get("enabled", False)
+        self.ai_weight = self.analyzer_config.get("ai_weight", 0.7)  # Updated default to 0.7
+        self.traditional_weight = self.analyzer_config.get("traditional_weight", 0.3)  # Updated default
         self.ai_analyzer = None
         if self.ai_enabled:
             self.ai_analyzer = AIAnalyzer(config)
