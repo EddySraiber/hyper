@@ -1,0 +1,311 @@
+# FinOps and DevOps Configuration for Algorithmic Trading System
+# Comprehensive cost optimization and infrastructure management
+
+finops:
+  enabled: true
+  
+  # Cost monitoring thresholds
+  cost_threshold_warning: 0.80    # 80% of budget
+  cost_threshold_critical: 0.95   # 95% of budget
+  optimization_interval: 3600     # 1 hour (seconds)
+  budget_check_interval: 1800     # 30 minutes (seconds)
+  
+  # Monthly budget allocations (USD)
+  monthly_budgets:
+    compute: 200        # EC2, Lambda, etc.
+    database: 600       # RDS, DynamoDB
+    storage: 50         # S3, EBS
+    network: 200        # Data transfer, Load Balancers
+    monitoring: 80      # CloudWatch, custom metrics
+    total: 1000         # Total monthly budget
+    
+  # Cost optimization targets
+  optimization_targets:
+    cost_reduction_goal: 0.15                # 15% cost reduction target
+    utilization_target: 0.80                 # 80% resource utilization
+    reserved_instance_coverage: 0.70         # 70% RI coverage
+    spot_instance_usage: 0.30                # 30% spot instance usage
+    
+  # Cloud provider configurations
+  aws_enabled: true
+  gcp_enabled: false
+  azure_enabled: false
+
+devops:
+  enabled: true
+  
+  # Infrastructure configuration
+  infrastructure:
+    target_environment: "production"
+    regions:
+      primary: "us-east-1"
+      backup: "us-west-2"
+    availability_zones: 3
+    
+  # Performance targets
+  performance_targets:
+    api_response_time_ms: 100       # API response time target
+    trading_latency_ms: 50          # Trading execution latency
+    system_availability_pct: 99.9   # System uptime target
+    cpu_utilization_target: 70      # Target CPU utilization
+    memory_utilization_target: 80   # Target memory utilization
+    disk_utilization_target: 85     # Target disk utilization
+    
+  # Auto-scaling thresholds
+  scaling_thresholds:
+    cpu_scale_up: 80               # Scale up at 80% CPU
+    cpu_scale_down: 30             # Scale down at 30% CPU
+    memory_scale_up: 85            # Scale up at 85% memory
+    memory_scale_down: 40          # Scale down at 40% memory
+    requests_per_second_scale_up: 1000
+    queue_depth_scale_up: 100
+    
+  # CI/CD pipeline configuration
+  cicd:
+    default_branch: "main"
+    environments: ["development", "staging", "production"]
+    automated_testing: true
+    security_scanning: true
+    deployment_approval_required: true  # For production
+    rollback_enabled: true
+    
+  # Monitoring and alerting
+  monitoring:
+    metrics_retention_days: 90
+    log_retention_days: 365
+    alert_channels: ["email", "slack"]
+    dashboard_refresh_interval: 30  # seconds
+
+cost_optimization:
+  enabled: true
+  
+  # Alert thresholds
+  alert_thresholds:
+    budget_warning: 0.80           # 80% of budget
+    budget_critical: 0.95          # 95% of budget
+    anomaly_threshold: 1.50        # 50% above normal
+    forecast_breach: 1.10          # 10% over forecast
+    
+  # Optimization targets
+  optimization_targets:
+    monthly_savings_goal: 200             # $200/month savings target
+    cost_efficiency_target: 0.08          # <8% of profit on infrastructure
+    utilization_efficiency: 0.80          # >80% resource utilization
+    automation_coverage: 0.90             # 90% of optimizations automated
+    
+  # Trading performance integration
+  trading_metrics:
+    target_profit_margin: 0.175           # 17.5% annual return
+    cost_per_trade_target: 0.50           # $0.50 infrastructure cost per trade
+    latency_cost_tolerance: 100           # Max $100/month for <100ms latency
+    
+  # Monitoring intervals (seconds)
+  alert_check_interval: 60        # 1 minute
+  optimization_interval: 300      # 5 minutes
+  forecast_interval: 3600         # 1 hour
+
+# Infrastructure as Code Templates
+infrastructure_templates:
+  
+  # Compute resources
+  compute:
+    primary_instance:
+      type: "t3.medium"
+      cpu_cores: 2
+      memory_gb: 4
+      cost_monthly: 30
+      auto_scaling:
+        min_instances: 1
+        max_instances: 4
+        target_cpu: 70
+        
+    high_performance_instance:
+      type: "c5.2xlarge"
+      cpu_cores: 8
+      memory_gb: 16
+      cost_monthly: 280
+      use_case: "high_frequency_trading"
+      
+  # Database configuration
+  database:
+    primary_db:
+      engine: "postgresql"
+      version: "15.4"
+      instance_class: "db.t3.medium"
+      allocated_storage_gb: 100
+      backup_retention_days: 35
+      multi_az: true
+      cost_monthly: 575
+      
+  # Storage configuration
+  storage:
+    application_storage:
+      type: "s3"
+      storage_class: "standard"
+      lifecycle_policies: true
+      versioning: true
+      cost_monthly: 25
+      
+  # Networking
+  networking:
+    load_balancer:
+      type: "application"
+      scheme: "internet-facing"
+      cost_monthly: 25
+      
+    data_transfer:
+      monthly_gb: 1300
+      cost_monthly: 150
+
+# Cost optimization rules
+optimization_rules:
+  
+  # Rightsizing rules
+  rightsizing:
+    cpu_threshold_downsize: 30     # Downsize if CPU < 30%
+    cpu_threshold_upsize: 85       # Upsize if CPU > 85%
+    memory_threshold_downsize: 40  # Downsize if memory < 40%
+    memory_threshold_upsize: 90    # Upsize if memory > 90%
+    evaluation_period_days: 7      # 7-day evaluation period
+    
+  # Reserved instance rules
+  reserved_instances:
+    utilization_threshold: 0.75    # Purchase RI if 75%+ utilization
+    commitment_period: "1_year"    # Default commitment
+    payment_option: "partial_upfront"
+    
+  # Spot instance rules
+  spot_instances:
+    suitable_workloads:
+      - "development"
+      - "testing"
+      - "batch_processing"
+    max_interruption_tolerance: 0.05  # 5% interruption tolerance
+    
+  # Storage optimization
+  storage_optimization:
+    intelligent_tiering: true
+    transition_to_ia_days: 30      # Transition to IA after 30 days
+    transition_to_glacier_days: 90  # Transition to Glacier after 90 days
+    delete_after_days: 2555        # Delete after 7 years (compliance)
+
+# Alerting and notification configuration
+alerting:
+  
+  # Alert channels
+  channels:
+    email:
+      enabled: true
+      recipients:
+        - "devops@tradingsystem.com"
+        - "finops@tradingsystem.com"
+    
+    slack:
+      enabled: false
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channel: "#infrastructure-alerts"
+      
+    pagerduty:
+      enabled: false
+      service_key: "${PAGERDUTY_SERVICE_KEY}"
+      
+  # Alert rules
+  rules:
+    cost_alerts:
+      budget_warning:
+        severity: "warning"
+        threshold: 0.80
+        channels: ["email"]
+        
+      budget_critical:
+        severity: "critical"
+        threshold: 0.95
+        channels: ["email", "slack"]
+        
+      cost_anomaly:
+        severity: "warning"
+        threshold: 1.50  # 50% above baseline
+        channels: ["email"]
+        
+    performance_alerts:
+      high_latency:
+        severity: "warning"
+        threshold: 150  # ms
+        channels: ["email"]
+        
+      system_down:
+        severity: "critical"
+        threshold: 0.99  # Below 99% availability
+        channels: ["email", "slack", "pagerduty"]
+
+# Compliance and security
+compliance:
+  
+  # Data retention policies
+  data_retention:
+    application_logs: 365          # 1 year
+    audit_logs: 2555              # 7 years (regulatory requirement)
+    metrics: 90                   # 3 months
+    backups: 2555                 # 7 years
+    
+  # Security requirements
+  security:
+    encryption_at_rest: true
+    encryption_in_transit: true
+    vpc_isolation: true
+    multi_factor_auth: true
+    access_logging: true
+    
+  # Backup requirements
+  backups:
+    frequency: "daily"
+    retention_days: 35
+    cross_region: true
+    automated_testing: true
+
+# Integration settings
+integrations:
+  
+  # Trading system integration
+  trading_system:
+    metrics_endpoint: "http://localhost:8080/metrics"
+    health_endpoint: "http://localhost:8080/health"
+    cost_allocation_tags:
+      - "trading-component"
+      - "environment"
+      - "cost-center"
+      
+  # External services
+  external_services:
+    aws_cost_explorer: true
+    aws_trusted_advisor: true
+    cloudwatch: true
+    prometheus: true
+    grafana: false
+
+# Environment-specific overrides
+environments:
+  
+  development:
+    monthly_budgets:
+      total: 300  # Reduced budget for dev
+    performance_targets:
+      system_availability_pct: 95.0  # Lower availability requirement
+    instance_types:
+      compute: "t3.micro"  # Smaller instances
+      
+  staging:
+    monthly_budgets:
+      total: 500  # Mid-tier budget
+    performance_targets:
+      system_availability_pct: 99.0
+    instance_types:
+      compute: "t3.small"
+      
+  production:
+    monthly_budgets:
+      total: 1000  # Full production budget
+    performance_targets:
+      system_availability_pct: 99.9
+    instance_types:
+      compute: "t3.medium"
