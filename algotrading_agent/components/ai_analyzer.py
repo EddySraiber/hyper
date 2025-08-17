@@ -14,7 +14,18 @@ class AIAnalyzer(ComponentBase):
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__("ai_analyzer", config)
-        self.ai_config = config.get("ai_analyzer", {})
+        # Handle both ConfigManager and dict, and both full config and direct ai_analyzer config
+        if hasattr(config, 'get'):  # ConfigManager or dict
+            try:
+                # Try to get ai_analyzer section (works for both ConfigManager and dict with nested config)
+                self.ai_config = config.get("ai_analyzer", {})
+                if not self.ai_config:  # Empty dict means we might have direct config
+                    self.ai_config = config if isinstance(config, dict) else {}
+            except:
+                # Fallback: treat as direct config
+                self.ai_config = config if isinstance(config, dict) else {}
+        else:
+            self.ai_config = config  # Direct ai_analyzer config passed
         self.primary_provider = self.ai_config.get("provider", "groq")
         self.providers_config = self.ai_config.get("providers", {})
         self.fallback_chain = self.ai_config.get("fallback_chain", ["groq", "openai", "anthropic", "traditional"])
