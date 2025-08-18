@@ -1,0 +1,25 @@
+{
+  "current_configuration": {
+    "cpu_cores": 16,
+    "memory_gb": 15.316421508789062,
+    "monthly_cost": 285.9492645263672
+  },
+  "optimized_configuration": {
+    "cpu_cores": 2,
+    "memory_gb": 16.350279960632324,
+    "monthly_cost": 79.05083988189698
+  },
+  "optimization_impact": {
+    "cpu_reduction_percent": 87.5,
+    "memory_reduction_percent": -6.75,
+    "monthly_savings": 206.8984246444702,
+    "annual_savings": 2482.7810957336424,
+    "cost_reduction_percent": 72.35494205140445
+  },
+  "performance_impact": {
+    "expected_cpu_utilization": 59.2,
+    "expected_memory_utilization": 80.00000000000001,
+    "safety_margin": 1.689189189189189,
+    "risk_level": "low"
+  }
+}

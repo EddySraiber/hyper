@@ -1,0 +1,44 @@
+{
+  "baseline_metrics": {
+    "timestamp": "2025-08-18T12:25:09.101898",
+    "cpu_cores": 16,
+    "memory_total_gb": 15.316421508789062,
+    "cpu_utilization_percent": 7.4,
+    "memory_utilization_percent": 85.4,
+    "estimated_monthly_cost": 285.9492645263672
+  },
+  "optimization_recommendations": {
+    "current_configuration": {
+      "cpu_cores": 16,
+      "memory_gb": 15.316421508789062,
+      "monthly_cost": 285.9492645263672
+    },
+    "optimized_configuration": {
+      "cpu_cores": 2,
+      "memory_gb": 16.350279960632324,
+      "monthly_cost": 79.05083988189698
+    },
+    "optimization_impact": {
+      "cpu_reduction_percent": 87.5,
+      "memory_reduction_percent": -6.75,
+      "monthly_savings": 206.8984246444702,
+      "annual_savings": 2482.7810957336424,
+      "cost_reduction_percent": 72.35494205140445
+    },
+    "performance_impact": {
+      "expected_cpu_utilization": 59.2,
+      "expected_memory_utilization": 80.00000000000001,
+      "safety_margin": 1.689189189189189,
+      "risk_level": "low"
+    }
+  },
+  "implementation_files": {
+    "docker_configs": {
+      "docker-compose.override.yml": "version: '3.8'\n\nservices:\n  algotrading-agent:\n    deploy:\n      resources:\n        limits:\n          cpus: '2.0'\n          memory: 16G\n        reservations:\n          cpus: '1.0'\n          memory: 11.4G\n    environment:\n      - OPTIMIZATION_MODE=enabled\n      - CPU_CORES=2\n      - MEMORY_GB=16\n      - PERFORMANCE_MONITORING=true\n",
+      "docker_run_optimized.sh": "docker run -d \\\n  --name algotrading-optimized \\\n  --cpus=\"2.0\" \\\n  --memory=\"16g\" \\\n  --restart=unless-stopped \\\n  -v $(pwd)/config:/app/config \\\n  -v $(pwd)/data:/app/data \\\n  -v $(pwd)/logs:/app/logs \\\n  algotrading-agent:latest",
+      "optimization_config.json": "{\n  \"current_configuration\": {\n    \"cpu_cores\": 16,\n    \"memory_gb\": 15.316421508789062,\n    \"monthly_cost\": 285.9492645263672\n  },\n  \"optimized_configuration\": {\n    \"cpu_cores\": 2,\n    \"memory_gb\": 16.350279960632324,\n    \"monthly_cost\": 79.05083988189698\n  },\n  \"optimization_impact\": {\n    \"cpu_reduction_percent\": 87.5,\n    \"memory_reduction_percent\": -6.75,\n    \"monthly_savings\": 206.8984246444702,\n    \"annual_savings\": 2482.7810957336424,\n    \"cost_reduction_percent\": 72.35494205140445\n  },\n  \"performance_impact\": {\n    \"expected_cpu_utilization\": 59.2,\n    \"expected_memory_utilization\": 80.00000000000001,\n    \"safety_margin\": 1.689189189189189,\n    \"risk_level\": \"low\"\n  }\n}"
+    },
+    "monitoring_script": "analysis/performance/optimization_configs/monitor_performance.py",
+    "implementation_guide": "analysis/performance/optimization_configs/IMPLEMENTATION_GUIDE.md"
+  }
+}

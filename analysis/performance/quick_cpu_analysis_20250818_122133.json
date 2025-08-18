@@ -1,0 +1,142 @@
+{
+  "timestamp": "2025-08-18T12:21:33.908147",
+  "system_config": {
+    "cpu_cores": 16,
+    "physical_cores": 10,
+    "memory_total_gb": 15.316421508789062
+  },
+  "usage_analysis": {
+    "cpu_average_percent": 7.233333333333333,
+    "cpu_peak_percent": 8.6,
+    "memory_average_percent": 85.40000000000002,
+    "memory_peak_percent": 85.4,
+    "cpu_cores_utilized": 1.1573333333333333,
+    "memory_gb_utilized": 13.080223968505862
+  },
+  "cost_analysis": {
+    "current_hourly_cost": 0.31947114603678395,
+    "estimated_daily_cost": 7.667307504882815,
+    "estimated_monthly_cost": 230.01922514648444,
+    "cpu_cost_percentage": 18.113268564167576,
+    "memory_cost_percentage": 81.88673143583243
+  },
+  "process_analysis": {
+    "total_processes_analyzed": 121,
+    "trading_related_processes": 6,
+    "top_cpu_processes": [
+      {
+        "name": "systemd",
+        "cpu_percent": 0.0,
+        "memory_mb": 13.58203125,
+        "cmdline": "/sbin/init splash"
+      },
+      {
+        "name": "systemd-journald",
+        "cpu_percent": 0.0,
+        "memory_mb": 62.5390625,
+        "cmdline": "/usr/lib/systemd/systemd-journald"
+      },
+      {
+        "name": "polkitd",
+        "cpu_percent": 0.0,
+        "memory_mb": 11.28515625,
+        "cmdline": "/usr/lib/polkit-1/polkitd --no-debug"
+      },
+      {
+        "name": "snapd",
+        "cpu_percent": 0.0,
+        "memory_mb": 28.9453125,
+        "cmdline": "/usr/lib/snapd/snapd"
+      },
+      {
+        "name": "udisksd",
+        "cpu_percent": 0.0,
+        "memory_mb": 10.859375,
+        "cmdline": "/usr/libexec/udisks2/udisksd"
+      }
+    ],
+    "top_memory_processes": [
+      {
+        "name": "chrome",
+        "cpu_percent": 0.0,
+        "memory_mb": 1428.3671875,
+        "cmdline": "/opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=7462"
+      },
+      {
+        "name": "chrome",
+        "cpu_percent": 0.0,
+        "memory_mb": 1053.5625,
+        "cmdline": "/opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=7462"
+      },
+      {
+        "name": "code",
+        "cpu_percent": 0.0,
+        "memory_mb": 806.9453125,
+        "cmdline": "/usr/share/code/code ."
+      },
+      {
+        "name": "claude",
+        "cpu_percent": 0.0,
+        "memory_mb": 723.45703125,
+        "cmdline": "claude  "
+      },
+      {
+        "name": "code",
+        "cpu_percent": 0.0,
+        "memory_mb": 685.671875,
+        "cmdline": "/usr/share/code/code /home/eddy/.vscode/extensions/ms-python.vscode-pylance-2025.7.1/dist/server.bundle.js --cancellationReceive=file:3bc2045378059f25a8744b8dd49ce4cffdd4c231ec"
+      }
+    ],
+    "trading_processes": [
+      {
+        "name": "unattended-upgr",
+        "cpu_percent": 0.0,
+        "memory_mb": 14.546875,
+        "cmdline": "/usr/bin/python3 /usr/share/unattended-upgrades/unattended-upgrade-shutdown --wait-for-signal"
+      },
+      {
+        "name": "dockerd",
+        "cpu_percent": 0.0,
+        "memory_mb": 74.83984375,
+        "cmdline": "/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock"
+      },
+      {
+        "name": "code",
+        "cpu_percent": 0.0,
+        "memory_mb": 685.671875,
+        "cmdline": "/usr/share/code/code /home/eddy/.vscode/extensions/ms-python.vscode-pylance-2025.7.1/dist/server.bun..."
+      },
+      {
+        "name": "python",
+        "cpu_percent": 0.0,
+        "memory_mb": 261.26953125,
+        "cmdline": "python main.py"
+      },
+      {
+        "name": "python3",
+        "cpu_percent": 0.0,
+        "memory_mb": 15.3515625,
+        "cmdline": "python3 analysis/performance/quick_cpu_analysis.py"
+      },
+      {
+        "name": "grafana",
+        "cpu_percent": 0.0,
+        "memory_mb": 237.93359375,
+        "cmdline": "grafana server --homepath=/usr/share/grafana --config=/etc/grafana/grafana.ini --packaging=docker cf..."
+      }
+    ]
+  },
+  "optimization_opportunities": [
+    {
+      "type": "cpu_rightsizing",
+      "priority": "high",
+      "current_state": "16 cores at 7.2% utilization",
+      "recommended_state": "2 cores at ~70% utilization",
+      "description": "Reduce CPU allocation by 14 cores (88% reduction)",
+      "estimated_monthly_savings": 504.0,
+      "implementation_effort": "medium",
+      "risk_level": "low",
+      "confidence": 0.9
+    }
+  ]
+}

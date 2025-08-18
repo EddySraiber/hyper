@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  algotrading-agent:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 16G
+        reservations:
+          cpus: '1.0'
+          memory: 11.4G
+    environment:
+      - OPTIMIZATION_MODE=enabled
+      - CPU_CORES=2
+      - MEMORY_GB=16
+      - PERFORMANCE_MONITORING=true

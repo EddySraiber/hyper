@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  algotrading-agent:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'    # Reduce from 0.5 to 0.25 (50% reduction)
+          memory: 800M    # Reduce from 1G to 800M (20% reduction) 
+        reservations:
+          cpus: '0.15'    # Conservative reservation
+          memory: 512M    # Keep same reservation
+    environment:
+      - OPTIMIZATION_MODE=enabled
+      - PERFORMANCE_MONITORING=true
+      - FINOPS_OPTIMIZED=true
