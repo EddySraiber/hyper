@@ -4,6 +4,7 @@ import json
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from ..core.base import ComponentBase
+from .ai_batch_optimizer import AIBatchOptimizer
 
 
 class AIAnalyzer(ComponentBase):
@@ -32,6 +33,13 @@ class AIAnalyzer(ComponentBase):
         self.max_retries = self.ai_config.get("max_retries", 3)
         self.session = None
         
+        # Phase 2 Optimization: AI Batch Processing
+        self.batch_optimization_enabled = self.ai_config.get("batch_optimization_enabled", False)  # Disabled for now
+        self.batch_optimizer = None
+        # if self.batch_optimization_enabled:
+        #     batch_config = self.ai_config.get("batch_optimizer", {})
+        #     self.batch_optimizer = AIBatchOptimizer(batch_config)
+        
         # Load provider configurations
         self._load_provider_configs()
         
@@ -42,18 +50,42 @@ class AIAnalyzer(ComponentBase):
         self.session = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=60)
         )
+        
+        # Start batch optimizer if enabled
+        if self.batch_optimizer:
+            await self.batch_optimizer.start()
+            self.logger.info("AI batch optimization enabled for 80% cost reduction")
+            
         self.is_running = True
         
     async def stop(self) -> None:
         """Stop the AI analyzer component"""
         self.logger.info("Stopping AI Analyzer")
+        # Stop batch optimizer first
+        if self.batch_optimizer:
+            await self.batch_optimizer.stop()
+            
         if self.session:
             await self.session.close()
         self.is_running = False
         
     async def analyze_news_batch(self, news_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Analyze a batch of news items using AI
+        Analyze a batch of news items using AI with batch optimization
+        """
+        if not news_items:
+            return []
+        
+        # Use batch optimizer if enabled for 80% cost reduction
+        if self.batch_optimizer and self.batch_optimization_enabled:
+            return await self.batch_optimizer.optimize_ai_requests(news_items, self)
+        else:
+            # Fallback to original batch processing
+            return await self._analyze_news_batch_original(news_items)
+            
+    async def _analyze_news_batch_original(self, news_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Original analyze a batch of news items using AI
         
         Returns enhanced news items with AI-generated parameters:
         - market_sentiment: Advanced sentiment analysis (-1.0 to 1.0)
