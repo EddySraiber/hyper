@@ -553,7 +553,7 @@ class AlgotradingAgent:
                 self.logger.warning(f"Trade warnings for {pair.symbol}: {validation['warnings']}")
                 
             # Execute the entry order via Enhanced Trade Manager (with bracket protection)
-            result = await self.enhanced_trade_manager.execute_trade(pair)
+            result = await self.trade_manager.execute_trade(pair)
             
             # Find the corresponding trade in the queue and update with order ID
             if result["success"] and result["data"]:
@@ -598,7 +598,7 @@ class AlgotradingAgent:
                         self.logger.info(f"⚡ URGENT EXECUTION: {pair.symbol} {pair.action}")
                         
                         # Execute via Enhanced Trade Manager (with bracket protection)
-                        result = await self.enhanced_trade_manager.execute_trade(pair)
+                        result = await self.trade_manager.execute_trade(pair)
                         
                         # Update trade queue with order ID
                         if result["success"] and result["data"]:

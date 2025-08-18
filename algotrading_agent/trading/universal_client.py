@@ -237,7 +237,7 @@ class UniversalTradingClient:
     async def _execute_alpaca_trade(self, client: AlpacaClient, trading_pair: TradingPair) -> Dict[str, Any]:
         """Execute trade via Alpaca client"""
         try:
-            result = await client.submit_order(trading_pair)
+            result = await client.execute_trading_pair(trading_pair)
             return {
                 'success': True,
                 'order_id': result.get('order_id'),
