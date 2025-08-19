@@ -37,7 +37,11 @@ class NewsAnalysisBrain(ComponentBase):
         self.traditional_weight = self.analyzer_config.get("traditional_weight", 0.3)  # Updated default
         self.ai_analyzer = None
         if self.ai_enabled:
-            self.ai_analyzer = AIAnalyzer(config)
+            # Pass the proper ai_analyzer config section, not the full config
+            from ..config.settings import get_config
+            full_config = get_config()
+            ai_analyzer_config = full_config.get_component_config('ai_analyzer')
+            self.ai_analyzer = AIAnalyzer(ai_analyzer_config)
             
         # Phase 2 Optimization: Async processing (temporarily disabled for stability)
         self.async_optimization_enabled = config.get("async_optimization_enabled", False)

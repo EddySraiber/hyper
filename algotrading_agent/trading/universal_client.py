@@ -285,6 +285,55 @@ class UniversalTradingClient:
         
         return all_positions
     
+    async def get_position_with_orders(self, symbol: str) -> Dict[str, Any]:
+        """Get position details with associated orders for a symbol"""
+        asset_class = self.detect_asset_class(symbol)
+        exchange = self.get_optimal_exchange(asset_class, symbol)
+        
+        if not exchange or exchange not in self.clients:
+            return {
+                'position': None,
+                'orders': [],
+                'error': f'No client available for {symbol}'
+            }
+        
+        try:
+            client = self.clients[exchange]
+            
+            # Use client-specific method if available
+            if hasattr(client, 'get_position_with_orders'):
+                return await client.get_position_with_orders(symbol)
+            else:
+                # Fallback: get position and orders separately
+                position = None
+                orders = []
+                
+                try:
+                    positions = await client.get_positions()
+                    position = next((p for p in positions if p.get('symbol') == symbol), None)
+                except:
+                    pass
+                    
+                try:
+                    all_orders = await client.get_orders()
+                    orders = [o for o in all_orders if o.get('symbol') == symbol]
+                except:
+                    pass
+                
+                return {
+                    'position': position,
+                    'orders': orders,
+                    'exchange': exchange.value
+                }
+                
+        except Exception as e:
+            self.logger.error(f"Error getting position with orders for {symbol}: {e}")
+            return {
+                'position': None,
+                'orders': [],
+                'error': str(e)
+            }
+    
     async def get_unified_account_info(self) -> Dict[str, Any]:
         """Get account information across all exchanges"""
         account_info = {
