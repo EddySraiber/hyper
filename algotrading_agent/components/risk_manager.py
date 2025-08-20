@@ -17,9 +17,22 @@ class RiskManager(PersistentComponent):
         
         # Kelly Criterion parameters
         self.enable_kelly_criterion = config.get("enable_kelly_criterion", True)
-        self.kelly_safety_factor = config.get("kelly_safety_factor", 0.25)  # Conservative 25% of Kelly optimal
+        self.kelly_safety_factor = config.get("kelly_safety_factor", 0.25)  # Base conservative safety factor
         self.max_kelly_position_pct = config.get("max_kelly_position_pct", 0.10)  # Cap at 10% regardless of Kelly
         self.min_trades_for_kelly = config.get("min_trades_for_kelly", 20)  # Minimum trades needed for Kelly calculation
+        
+        # Dynamic Kelly parameters
+        self.enable_dynamic_kelly = config.get("enable_dynamic_kelly", True)
+        self.kelly_regime_multipliers = config.get("kelly_regime_multipliers", {
+            "bull_trending": 1.3,
+            "bear_trending": 0.7,
+            "sideways": 0.9,
+            "high_volatility": 0.6,
+            "low_volatility": 1.1
+        })
+        self.kelly_performance_window = config.get("kelly_performance_window", 10)  # Recent trades to consider
+        self.kelly_confidence_boost_threshold = config.get("kelly_confidence_boost_threshold", 0.7)  # 70% win rate boost
+        self.kelly_confidence_reduce_threshold = config.get("kelly_confidence_reduce_threshold", 0.4)  # 40% win rate reduction
         
         # Crypto-specific risk management
         self.crypto_enabled = config.get("crypto_enabled", True)
@@ -195,15 +208,10 @@ class RiskManager(PersistentComponent):
             
         return True
         
-    def _calculate_kelly_criterion(self, symbol: str = None, action: str = None) -> float:
+    def _calculate_kelly_criterion(self, symbol: str = None, action: str = None, market_regime: str = None) -> float:
         """
-        Calculate Kelly Criterion optimal position size.
-        Formula: f* = (bp - q) / b
-        Where:
-        - f* = optimal fraction of capital to bet
-        - b = odds received (average win / average loss)
-        - p = probability of winning
-        - q = probability of losing (1-p)
+        Calculate Dynamic Kelly Criterion optimal position size with regime and performance adjustments.
+        Formula: f* = (bp - q) / b * dynamic_adjustments
         """
         if not self.enable_kelly_criterion or len(self.trade_history) < self.min_trades_for_kelly:
             return self.max_position_pct  # Fall back to fixed percentage
@@ -246,13 +254,99 @@ class RiskManager(PersistentComponent):
         
         # Apply safety factor and caps
         kelly_fraction = max(0, kelly_fraction)  # Never go negative
-        kelly_fraction *= self.kelly_safety_factor  # Apply conservative safety factor
+        
+        # **DYNAMIC ENHANCEMENTS**
+        if self.enable_dynamic_kelly:
+            dynamic_safety_factor = self._calculate_dynamic_kelly_factor(symbol, market_regime, relevant_trades)
+            kelly_fraction *= dynamic_safety_factor
+        else:
+            kelly_fraction *= self.kelly_safety_factor  # Static safety factor
+        
         kelly_fraction = min(kelly_fraction, self.max_kelly_position_pct)  # Cap at maximum
         
-        self.logger.info(f"Kelly Criterion calculation for {symbol or 'any'} {action or 'any'}: "
-                        f"p={p:.3f}, b={b:.3f}, Kelly={kelly_fraction:.3f}")
+        self.logger.info(f"Dynamic Kelly calculation for {symbol or 'any'} {action or 'any'}: "
+                        f"p={p:.3f}, b={b:.3f}, regime={market_regime}, Kelly={kelly_fraction:.3f}")
         
         return kelly_fraction
+    
+    def _calculate_dynamic_kelly_factor(self, symbol: str, market_regime: str, relevant_trades: List[Dict]) -> float:
+        """Calculate dynamic Kelly safety factor based on recent performance and market regime"""
+        base_factor = self.kelly_safety_factor
+        
+        # 1. Recent performance adjustment
+        recent_trades = relevant_trades[-self.kelly_performance_window:] if len(relevant_trades) >= self.kelly_performance_window else relevant_trades
+        if recent_trades:
+            recent_wins = [t for t in recent_trades if t.get("pnl", 0) > 0]
+            recent_win_rate = len(recent_wins) / len(recent_trades)
+            
+            if recent_win_rate >= self.kelly_confidence_boost_threshold:
+                performance_multiplier = 1.4  # Boost confidence on good recent performance
+            elif recent_win_rate <= self.kelly_confidence_reduce_threshold:
+                performance_multiplier = 0.6  # Reduce on poor recent performance
+            else:
+                performance_multiplier = 1.0  # Neutral
+        else:
+            performance_multiplier = 1.0
+        
+        # 2. Market regime adjustment
+        regime_multiplier = self.kelly_regime_multipliers.get(market_regime, 1.0)
+        
+        # 3. Crypto-specific adjustment
+        crypto_multiplier = 0.8 if symbol and self._is_crypto_symbol(symbol) else 1.0
+        
+        # Combine all factors
+        dynamic_factor = base_factor * performance_multiplier * regime_multiplier * crypto_multiplier
+        
+        # Safety bounds: never go below 10% or above 60% of base Kelly
+        dynamic_factor = max(base_factor * 0.1, min(dynamic_factor, base_factor * 2.4))
+        
+        return dynamic_factor
+    
+    def _get_market_regime(self) -> str:
+        """Get current market regime from market regime detector component"""
+        try:
+            # Import here to avoid circular imports
+            from algotrading_agent.components.market_regime_detector import MarketRegimeDetector
+            
+            # Try to get regime from main system if available
+            if hasattr(self, '_market_regime_detector') and self._market_regime_detector:
+                regime_signal = self._market_regime_detector.get_current_regime()
+                if regime_signal:
+                    return regime_signal.regime.value
+            
+            # Fallback to simple regime detection based on recent trades
+            return self._simple_regime_detection()
+        except Exception as e:
+            self.logger.warning(f"Could not get market regime: {e}")
+            return "sideways"  # Default neutral regime
+    
+    def _simple_regime_detection(self) -> str:
+        """Simple fallback regime detection based on trade performance"""
+        if len(self.trade_history) < 5:
+            return "sideways"
+        
+        recent_trades = self.trade_history[-10:]
+        recent_returns = [t.get("pnl", 0) for t in recent_trades]
+        
+        if not recent_returns:
+            return "sideways"
+        
+        avg_return = statistics.mean(recent_returns)
+        volatility = statistics.stdev(recent_returns) if len(recent_returns) > 1 else 0
+        
+        # Simple regime classification
+        if volatility > abs(avg_return) * 3:
+            return "high_volatility"
+        elif avg_return > 0 and volatility < abs(avg_return):
+            return "bull_trending"
+        elif avg_return < 0 and volatility < abs(avg_return):
+            return "bear_trending"
+        else:
+            return "sideways"
+    
+    def set_market_regime_detector(self, detector) -> None:
+        """Set reference to market regime detector component"""
+        self._market_regime_detector = detector
         
     def record_trade_outcome(self, symbol: str, action: str, entry_price: float, 
                            exit_price: float, quantity: int, outcome_type: str) -> None:
@@ -310,8 +404,9 @@ class RiskManager(PersistentComponent):
             adjusted_stop = pair.entry_price * (1 + default_stop_loss_pct * volatility_factor)
             pair.stop_loss = max(pair.stop_loss, adjusted_stop)
             
-        # Use Kelly Criterion for optimal position sizing (crypto-aware)
-        kelly_fraction = self._calculate_kelly_criterion(pair.symbol, pair.action)
+        # Use Dynamic Kelly Criterion for optimal position sizing (crypto-aware)
+        current_regime = self._get_market_regime()
+        kelly_fraction = self._calculate_kelly_criterion(pair.symbol, pair.action, current_regime)
         
         # Apply crypto-specific position sizing constraints
         if is_crypto and self.crypto_enabled:

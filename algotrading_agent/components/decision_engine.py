@@ -420,10 +420,10 @@ class DecisionEngine(ComponentBase):
             
             if bullish_weight > bearish_weight:
                 options_signal_direction = 1  # Bullish
-                options_boost = min(0.15, (bullish_weight - bearish_weight) * 0.1)  # Max 15% boost
+                options_boost = min(0.20, (bullish_weight - bearish_weight) * 0.15)  # Max 20% boost (enhanced)
             elif bearish_weight > bullish_weight:
                 options_signal_direction = -1  # Bearish
-                options_boost = min(0.15, (bearish_weight - bullish_weight) * 0.1)
+                options_boost = min(0.20, (bearish_weight - bullish_weight) * 0.15)  # Max 20% boost (enhanced)
             
             # Apply options flow boost to confidence
             if options_boost > 0:

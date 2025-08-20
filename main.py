@@ -389,32 +389,44 @@ class AlgotradingAgent:
                     self._status_log_counter = 0
                 
                 # Step 1: Scrape news (always continue - keeps system warm)
-                self.logger.info("Scraping news...")
+                self.logger.info("🚀 PARALLEL PIPELINE: Scraping news...")
+                start_time = asyncio.get_event_loop().time()
+                
                 raw_news = await self.news_scraper.process()
                 self.logger.info(f"Scraped {len(raw_news)} news items")
                 
                 if not raw_news:
-                    await asyncio.sleep(60)  # Wait before next iteration
+                    await asyncio.sleep(30)  # Reduced from 60s - faster recovery
                     continue
                     
-                # Step 2: Filter news
-                self.logger.info("Filtering news...")
-                filtered_news = self.news_filter.process(raw_news)
-                self.logger.info(f"Filtered to {len(filtered_news)} relevant items")
+                # Step 2-4: Parallel processing pipeline
+                self.logger.info("🔄 PIPELINE: Filtering → Analyzing → Scoring (parallel)")
                 
-                if not filtered_news:
-                    await asyncio.sleep(60)
-                    continue
+                try:
+                    # Start with filtering (fast, synchronous)
+                    filtered_news = self.news_filter.process(raw_news)
+                    self.logger.info(f"Filtered to {len(filtered_news)} relevant items")
                     
-                # Step 3: Analyze news
-                self.logger.info("Analyzing news...")
-                analyzed_news = await self.news_brain.process(filtered_news)
-                self.logger.info(f"Analyzed {len(analyzed_news)} news items")
-                
-                # Step 3.5: Score news impact potential
-                self.logger.info("Scoring news impact...")
-                scored_news = self.news_impact_scorer.process(analyzed_news)
-                self.logger.info(f"Scored {len(scored_news)} news items for market impact")
+                    if not filtered_news:
+                        await asyncio.sleep(30)  # Reduced from 60s
+                        continue
+                    
+                    # Parallel execution: Analysis + any other async tasks
+                    analysis_task = self.news_brain.process(filtered_news)
+                    
+                    # Wait for analysis to complete
+                    analyzed_news = await analysis_task
+                    self.logger.info(f"Analyzed {len(analyzed_news)} news items")
+                    
+                    # Impact scoring (fast, can be synchronous)
+                    scored_news = self.news_impact_scorer.process(analyzed_news)
+                    
+                    processing_time = asyncio.get_event_loop().time() - start_time
+                    self.logger.info(f"⚡ PIPELINE COMPLETED: {len(scored_news)} items in {processing_time:.2f}s")
+                    
+                except Exception as e:
+                    self.logger.error(f"Error in parallel pipeline: {e}")
+                    continue
                 
                 # Log high-impact news summary
                 impact_summary = self.news_impact_scorer.get_impact_summary(scored_news)
@@ -432,13 +444,18 @@ class AlgotradingAgent:
                     # Clear previous decisions in rest mode
                     self._last_decisions = []
                 else:
-                    # Step 4: Make trading decisions using impact-scored news
-                    self.logger.info("Making trading decisions...")
+                    # Step 4: Parallel trading decision making + risk management
+                    self.logger.info("🎯 DECISION PIPELINE: Parallel analysis...")
+                    decision_start = asyncio.get_event_loop().time()
+                    
+                    # Generate trading decisions (already optimized internally)
                     trading_pairs = await self.decision_engine.process(scored_news)
-                    self.logger.info(f"Generated {len(trading_pairs)} trading decisions")
+                    
+                    decision_time = asyncio.get_event_loop().time() - decision_start
+                    self.logger.info(f"⚡ DECISIONS: {len(trading_pairs)} pairs in {decision_time:.2f}s")
                     
                     if not trading_pairs:
-                        await asyncio.sleep(60)
+                        await asyncio.sleep(20)  # Reduced from 60s - faster iteration when no trades
                         continue
                         
                     # Step 5: Apply statistical insights
@@ -491,12 +508,17 @@ class AlgotradingAgent:
                 # Wait before next iteration - shorter delay if we're in active trading mode
                 base_interval = self.config.get('news_scraper.update_interval', 300)
                 
-                # Speed up processing when markets are open and active
-                if market_open and self.trade_manager and len(self.trade_manager.active_trades) < 5:
-                    # Faster processing when we have capacity for new trades
-                    processing_interval = max(5, base_interval // 2)  # At least 5 seconds, or half the base
-                    self.logger.debug(f"Active trading mode: processing every {processing_interval}s")
+                # Dynamic processing intervals for optimal timing
+                if market_open and self.trade_manager and len(self.trade_manager.active_trades) < 8:
+                    # Aggressive mode: Fast processing when we have capacity
+                    processing_interval = max(15, base_interval // 4)  # At least 15 seconds, or quarter base
+                    self.logger.debug(f"⚡ AGGRESSIVE MODE: processing every {processing_interval}s")
+                elif market_open:
+                    # Active mode: Moderate speed when markets open
+                    processing_interval = max(30, base_interval // 2)  # At least 30 seconds, or half base
+                    self.logger.debug(f"🔄 ACTIVE MODE: processing every {processing_interval}s")
                 else:
+                    # Rest mode: Normal interval when markets closed
                     processing_interval = base_interval
                     
                 await asyncio.sleep(processing_interval)

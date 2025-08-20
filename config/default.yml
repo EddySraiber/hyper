@@ -186,10 +186,10 @@ decision_engine:
     - AMD
     update_interval: 300
     volume_thresholds:
-      extreme_multiplier: 10.0
-      min_premium: 50000
-      min_volume: 100
-      unusual_multiplier: 3.0
+      extreme_multiplier: 8.0
+      min_premium: 25000
+      min_volume: 50
+      unusual_multiplier: 2.5
   options_flow_enabled: true
   preferred_order_type_default: limit
   recency_weight: 0.2
@@ -1043,7 +1043,7 @@ news_scraper:
   - name: Crypto Briefing
     type: rss
     url: https://cryptobriefing.com/feed/
-  update_interval: 60
+  update_interval: 30
 observability:
   alerts:
     channels:
@@ -1235,6 +1235,17 @@ risk_manager:
   max_position_pct: 0.05
   max_sector_exposure_pct: 0.2
   min_trades_for_kelly: 20
+  # Dynamic Kelly Enhancement
+  enable_dynamic_kelly: true
+  kelly_regime_multipliers:
+    bull_trending: 1.3
+    bear_trending: 0.7
+    sideways: 0.9
+    high_volatility: 0.6
+    low_volatility: 1.1
+  kelly_performance_window: 10
+  kelly_confidence_boost_threshold: 0.7
+  kelly_confidence_reduce_threshold: 0.4
 statistical_advisor:
   confidence_threshold: 0.6
   lookback_days: 30
