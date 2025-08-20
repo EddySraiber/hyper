@@ -221,7 +221,7 @@ enhanced_news_scraper:
     type: api
     url: https://finnhub.io/api/v1/company-news?symbol=AAPL&from=2024-01-01&to=2025-12-31
   - api_key_env: NEWS_API_KEY
-    enabled: false
+    enabled: true
     name: News API Business
     priority: 2
     rate_limit: 3600.0
@@ -290,12 +290,13 @@ enhanced_news_scraper:
     rate_limit: 5.0
     type: api
     url: https://query1.finance.yahoo.com/v1/finance/trending/US
+  # Fixed Federal Reserve with RSS feed instead of non-existent JSON
   - enabled: true
-    name: Federal Reserve Economic Calendar
+    name: Federal Reserve Press Releases
     priority: 1
     rate_limit: 60.0
-    type: api
-    url: https://www.federalreserve.gov/json/ne-publications.json
+    type: rss
+    url: https://www.federalreserve.gov/feeds/press_all.xml
   - enabled: false
     name: OpenFIGI Security Search
     priority: 3
@@ -344,12 +345,13 @@ enhanced_news_scraper:
     rate_limit: 5.0
     type: api
     url: https://api.coingecko.com/api/v3/search/trending
+  # Fixed CoinGecko - removed news endpoint, using price data
   - enabled: true
-    name: CoinGecko News
-    priority: 1
+    name: CoinGecko Markets
+    priority: 2
     rate_limit: 10.0
     type: api
-    url: https://api.coingecko.com/api/v3/news
+    url: https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&sparkline=false
   - enabled: true
     name: CryptoCompare News
     priority: 1
@@ -528,10 +530,13 @@ enhanced_news_scraper:
     url: https://api.twitter.com/2/tweets/search/recent?query=%23stocks OR %23trading
       OR %23markets OR %23finance&max_results=100
   sources:
+  # Fixed Reuters with fallback
   - name: Reuters Business
     priority: 1
     type: rss
-    url: https://feeds.reuters.com/reuters/businessNews
+    url: http://feeds.reuters.com/reuters/businessNews
+    backup_url: https://www.reuters.com/business/
+    timeout: 30
   - name: MarketWatch
     priority: 2
     type: rss
@@ -548,10 +553,12 @@ enhanced_news_scraper:
     priority: 2
     type: rss
     url: https://www.cnbc.com/id/15839135/device/rss/rss.html
+  # Fixed CoinDesk with working URL
   - name: CoinDesk RSS
     priority: 1
     type: rss
-    url: https://feeds.coindesk.com/CoinDesk
+    url: https://www.coindesk.com/arc/outboundfeeds/rss/
+    backup_url: https://www.coindesk.com/feed/
   - name: Cointelegraph RSS
     priority: 1
     type: rss
@@ -584,18 +591,21 @@ enhanced_news_scraper:
     priority: 2
     type: rss
     url: https://feeds.a.dj.com/rss/RSSBarrons.xml
+  # Fixed Motley Fool with working URL
   - name: The Motley Fool
     priority: 3
     type: rss
-    url: https://www.fool.com/RSS/RSSRecentArticles.aspx
+    url: https://www.fool.com/feeds/index.aspx
+    backup_url: https://www.fool.com/rss/rss_index.aspx
   - name: Morningstar
     priority: 2
     type: rss
     url: https://www.morningstar.com/rss/all_articles.xml
+  # Fixed TheStreet with working URL
   - name: The Street
     priority: 2
     type: rss
-    url: https://www.thestreet.com/feeds/stocks
+    url: https://www.thestreet.com/rss/news
   - name: Benzinga
     priority: 2
     type: rss
@@ -628,18 +638,20 @@ enhanced_news_scraper:
     priority: 1
     type: rss
     url: https://www.federalreserve.gov/feeds/press_all.xml
+  # Fixed US Treasury with working URL
   - name: US Treasury News
     priority: 1
     type: rss
-    url: https://home.treasury.gov/rss/press-releases
+    url: https://www.treasury.gov/press-center/press-releases/Pages/RSS.aspx
   - name: SEC Press Releases
     priority: 2
     type: rss
     url: https://www.sec.gov/news/pressreleases.rss
-  - name: CoinMarketCap News
-    priority: 1
+  # Fixed CoinMarketCap with working URL
+  - name: CoinMarketCap Blog
+    priority: 2
     type: rss
-    url: https://coinmarketcap.com/rss/
+    url: https://blog.coinmarketcap.com/feed/
   - name: CryptoNews
     priority: 2
     type: rss
@@ -988,7 +1000,7 @@ news_scraper:
   sources:
   - name: Reuters Business
     type: rss
-    url: https://feeds.reuters.com/reuters/businessNews
+    url: https://www.reuters.com/business/rss
   - name: Yahoo Finance
     type: rss
     url: https://feeds.finance.yahoo.com/rss/2.0/headline
@@ -1004,6 +1016,33 @@ news_scraper:
   - name: CNBC Markets
     type: rss
     url: https://www.cnbc.com/id/15839135/device/rss/rss.html
+  - name: AP News Business
+    type: rss
+    url: https://feeds.apnews.com/rss/apf-topnews
+  - name: Financial Times Markets
+    type: rss
+    url: https://www.ft.com/markets?format=rss
+  - name: Wall Street Journal Markets
+    type: rss
+    url: https://feeds.a.dj.com/rss/RSSMarketsMain.xml
+  - name: Barrons Markets
+    type: rss
+    url: https://feeds.barrons.com/public/rss/us-markets
+  - name: Investor's Business Daily
+    type: rss
+    url: https://www.investors.com/rss-articles/
+  - name: TheStreet Markets
+    type: rss
+    url: https://www.thestreet.com/rss/recent-articles
+  - name: CoinDesk
+    type: rss
+    url: https://www.coindesk.com/arc/outboundfeeds/rss/
+  - name: CoinTelegraph
+    type: rss
+    url: https://cointelegraph.com/rss
+  - name: Crypto Briefing
+    type: rss
+    url: https://cryptobriefing.com/feed/
   update_interval: 60
 observability:
   alerts:

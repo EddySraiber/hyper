@@ -13,9 +13,13 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install testing dependencies for CI
+RUN pip install pytest pytest-asyncio pytest-cov pytest-benchmark pytest-timeout vaderSentiment beautifulsoup4 lxml
+
 # Copy application code
 COPY algotrading_agent/ ./algotrading_agent/
 COPY config/ ./config/
+COPY tests/ ./tests/
 COPY main.py .
 
 # Create data directory for persistence

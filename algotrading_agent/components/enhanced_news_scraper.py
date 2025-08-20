@@ -16,7 +16,7 @@ import feedparser
 import hashlib
 import json
 from typing import List, Dict, Any, Optional, Set
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from dataclasses import dataclass
 from ..core.base import ComponentBase
@@ -1151,25 +1151,29 @@ class EnhancedNewsScraper(ComponentBase):
         return hashlib.md5(combined.encode()).hexdigest()
     
     def _parse_date(self, date_str: str) -> datetime:
-        """Parse various date formats"""
+        """Parse various date formats with timezone awareness"""
         if not date_str:
-            return datetime.utcnow()
+            return datetime.utcnow().replace(tzinfo=timezone.utc)
         
         try:
-            # Try ISO format first
-            return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            # Try ISO format first - ensure timezone awareness
+            dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
         except:
             try:
                 # Try RFC 2822 format (common in RSS)
                 import email.utils
+                from datetime import timezone
                 timestamp = email.utils.parsedate_tz(date_str)
                 if timestamp:
-                    return datetime.fromtimestamp(email.utils.mktime_tz(timestamp))
+                    return datetime.fromtimestamp(email.utils.mktime_tz(timestamp), tz=timezone.utc)
             except:
                 pass
             
-        # Fallback to current time
-        return datetime.utcnow()
+        # Fallback to current time with UTC timezone
+        return datetime.utcnow().replace(tzinfo=timezone.utc)
     
     def _parse_timestamp(self, timestamp: Any) -> datetime:
         """Parse timestamp from API responses"""

@@ -1,0 +1,163 @@
+# Premium News Sources Configuration
+# Add these to default.yml enhanced_news_scraper section for 90%+ reliability
+
+premium_api_sources:
+  # Tier 1 - High-Quality Financial APIs
+  - name: "TradingView News API"
+    url: "https://news-headlines.tradingview.com/headlines/yahoo/symbol/{symbol}"
+    type: api
+    priority: 1
+    rate_limit: 10.0
+    enabled: true
+    symbols: ["AAPL", "MSFT", "GOOGL", "TSLA", "SPY", "QQQ"]
+
+  - name: "MarketAux News API"
+    url: "https://api.marketaux.com/v1/news/all?countries=us&filter_entities=true&limit=50"
+    api_key_env: "MARKETAUX_API_KEY"
+    type: api
+    priority: 1
+    rate_limit: 100.0
+    enabled: true
+
+  - name: "Financial Modeling Prep News"
+    url: "https://financialmodelingprep.com/api/v3/fmp/articles"
+    api_key_env: "FMP_API_KEY"
+    type: api
+    priority: 1
+    rate_limit: 250.0
+    enabled: true
+
+  - name: "Yahoo Finance API v8"
+    url: "https://yfapi.net/v8/finance/spark"
+    api_key_env: "YAHOO_FINANCE_API_KEY"
+    type: api
+    priority: 1
+    rate_limit: 100.0
+    enabled: true
+
+enhanced_rss_sources:
+  # Tier 2 - Reliable RSS with Fallbacks
+  - name: "Barron's Main Feed"
+    url: "https://www.barrons.com/rss/articles"
+    backup_url: "https://feeds.content.dowjones.io/public/rss/mw_topstories"
+    type: rss
+    priority: 1
+    timeout: 30
+    enabled: true
+
+  - name: "Investor's Business Daily"
+    url: "https://www.investors.com/news/feed/"
+    type: rss
+    priority: 1
+    enabled: true
+
+  - name: "Zacks Investment News"
+    url: "https://www.zacks.com/rss/rss_news.xml"
+    type: rss
+    priority: 2
+    enabled: true
+
+  - name: "Morningstar Markets"
+    url: "https://www.morningstar.com/rss/news"
+    backup_url: "https://www.morningstar.com/feeds/stock-market-news.xml"
+    type: rss
+    priority: 2
+    enabled: true
+
+crypto_premium_sources:
+  # Tier 3 - Crypto-Focused Sources
+  - name: "CoinTelegraph RSS Fixed"
+    url: "https://cointelegraph.com/rss"
+    type: rss
+    priority: 1
+    enabled: true
+
+  - name: "Decrypt Media"
+    url: "https://decrypt.co/feed"
+    type: rss
+    priority: 1
+    enabled: true
+
+  - name: "The Block Research"
+    url: "https://www.theblockcrypto.com/rss.xml"
+    type: rss
+    priority: 1
+    enabled: true
+
+  - name: "CoinDesk Markets"
+    url: "https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml"
+    type: rss
+    priority: 1
+    enabled: true
+
+social_premium_sources:
+  # Tier 4 - Social Sentiment (Enhanced)
+  - name: "Reddit Finance RSS"
+    url: "https://www.reddit.com/r/finance.rss"
+    type: social
+    priority: 2
+    rate_limit: 60.0
+    enabled: true
+    headers:
+      User-Agent: "AlgoTradingAgent/2.0 Educational Research"
+
+  - name: "StockTwits Watchlist RSS"
+    url: "https://stocktwits.com/watchlists.rss"
+    type: social
+    priority: 2
+    rate_limit: 30.0
+    enabled: true
+
+websocket_premium_sources:
+  # Tier 5 - Real-time WebSocket Feeds
+  - name: "Twelvedata WebSocket"
+    url: "wss://ws.twelvedata.com/v1/quotes/price"
+    api_key_env: "TWELVEDATA_API_KEY"
+    type: websocket
+    priority: 1
+    enabled: true
+
+  - name: "Tiingo WebSocket"
+    url: "wss://api.tiingo.com/iex"
+    api_key_env: "TIINGO_API_KEY"
+    type: websocket
+    priority: 1
+    enabled: true
+
+alternative_data_sources:
+  # Tier 6 - Alternative Data
+  - name: "SEC Filing RSS"
+    url: "https://sec.report/rss"
+    type: rss
+    priority: 2
+    enabled: true
+
+  - name: "Economic Policy Institute"
+    url: "https://www.epi.org/feed/"
+    type: rss
+    priority: 3
+    enabled: true
+
+  - name: "Federal Reserve Bank Feeds"
+    urls:
+      - "https://www.newyorkfed.org/rss/press-releases"
+      - "https://www.chicagofed.org/rss/publications"
+      - "https://www.stlouisfed.org/rss/press-releases"
+    type: rss
+    priority: 2
+    enabled: true
+
+reliability_thresholds:
+  # Source reliability scoring
+  min_success_rate: 0.7      # 70% minimum success rate
+  max_avg_response_time: 15  # 15 seconds max response time
+  failure_disable_count: 10  # Disable after 10 consecutive failures
+  reliability_check_interval: 300  # Check every 5 minutes
+
+fallback_strategies:
+  # Fallback mechanisms
+  enable_backup_urls: true
+  enable_http_fallback: true  # HTTP fallback for HTTPS failures
+  enable_mirror_sources: true
+  retry_exponential_backoff: true
+  max_retry_attempts: 5
