@@ -322,6 +322,14 @@ class DecisionEngine(ComponentBase):
                 # Get options flow signals for this symbol
                 symbol_options_flows = options_signals.get(symbol, [])
                 
+                # If no options flow for this symbol but we have market-wide signals, use them as proxy
+                if not symbol_options_flows and options_signals:
+                    # Use SPY as market proxy for unlisted symbols
+                    spy_flows = options_signals.get('SPY', [])
+                    if spy_flows:
+                        symbol_options_flows = spy_flows[:2]  # Use up to 2 SPY signals as market proxy
+                        self.logger.debug(f"📊 Using SPY options proxy for {symbol} ({len(symbol_options_flows)} signals)")
+                
                 decision = await self._make_decision(symbol, news_items, market_data, regime_adjustments, symbol_options_flows)
                 if decision:
                     trading_pairs.append(decision)
@@ -418,17 +426,22 @@ class DecisionEngine(ComponentBase):
             bullish_weight = sum(f.strength * f.confidence for f in bullish_flows)
             bearish_weight = sum(f.strength * f.confidence for f in bearish_flows)
             
+            self.logger.debug(f"📊 OPTIONS WEIGHTS: {symbol} bullish={bullish_weight:.3f}, bearish={bearish_weight:.3f}")
+            
             if bullish_weight > bearish_weight:
                 options_signal_direction = 1  # Bullish
                 options_boost = min(0.20, (bullish_weight - bearish_weight) * 0.15)  # Max 20% boost (enhanced)
             elif bearish_weight > bullish_weight:
                 options_signal_direction = -1  # Bearish
                 options_boost = min(0.20, (bearish_weight - bullish_weight) * 0.15)  # Max 20% boost (enhanced)
+            else:
+                options_boost = 0.0  # No net directional bias
             
             # Apply options flow boost to confidence
             if options_boost > 0:
+                original_confidence = confidence
                 confidence += options_boost
-                self.logger.debug(f"📊 OPTIONS BOOST: {symbol} confidence +{options_boost:.3f} "
+                self.logger.info(f"📊 OPTIONS BOOST: {symbol} {original_confidence:.3f} → {confidence:.3f} (+{options_boost:.3f}) "
                                 f"({'bullish' if options_signal_direction > 0 else 'bearish'} flow)")
                 
                 # Log significant options activity

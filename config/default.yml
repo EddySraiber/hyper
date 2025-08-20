@@ -184,6 +184,46 @@ decision_engine:
     - META
     - NFLX
     - AMD
+    - INTC
+    - CRM
+    - DIS
+    - BA
+    - JPM
+    - BAC
+    - WFC
+    - GS
+    - XOM
+    - CVX
+    - KO
+    - PFE
+    - UBER
+    - COIN
+    - PLTR
+    - ROKU
+    - SQ
+    - PYPL
+    - ZM
+    - SHOP
+    - SPOT
+    - CRWD
+    - SNOW
+    - NET
+    - DDOG
+    - MDB
+    - OKTA
+    - TWLO
+    - DOCU
+    - ZS
+    - MNDY
+    - WDAY
+    - NOW
+    - ADBE
+    - ORCL
+    - INTU
+    - VMW
+    - PANW
+    - FTNT
+    - CHKP
     update_interval: 300
     volume_thresholds:
       extreme_multiplier: 8.0
